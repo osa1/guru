@@ -38,7 +38,7 @@ TODO: Replace M.fromLists with a fromList that checks for duplicate keys
 parse :: Parser [Gdb.Out]
 parse = do
     msgs <- many parseOut
-    _ <- string "(gdb)"
+    _ <- string "(gdb) \n"
     return msgs
 
 parseOut :: Parser Gdb.Out
