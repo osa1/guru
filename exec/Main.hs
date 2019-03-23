@@ -1,3 +1,7 @@
 module Main where
 
-main = return ()
+import System.Environment (getArgs)
+import qualified Guru
+
+main :: IO ()
+main = getArgs >>= Guru.run

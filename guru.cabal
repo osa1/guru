@@ -13,6 +13,15 @@ category:            Development
 extra-source-files:  CHANGELOG.md
 
 library
+  exposed-modules:
+    Gdb.Parser
+    Gdb.Syntax
+    Guru
+
+  other-modules:
+    Gdb.Process
+    Widgets.Gdb
+
   hs-source-dirs: src
 
   build-depends:
@@ -20,19 +29,20 @@ library
     base ^>=4.12.0.0,
     bytestring,
     containers,
+    gi-gdk,
+    gi-gio,
+    gi-glib,
     gi-gtk,
+    haskell-gi-base,
     lens,
     text,
+    typed-process,
 
   default-extensions:
     LambdaCase
     OverloadedLabels
     OverloadedStrings
     ScopedTypeVariables
-
-  exposed-modules:
-    Gdb.Parser
-    Gdb.Syntax
 
   default-language: Haskell2010
   ghc-options: -Wall -O2
