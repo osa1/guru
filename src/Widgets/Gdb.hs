@@ -5,16 +5,19 @@ module Widgets.Gdb
   , getGtkWidget
   , enterConnectedState
   , enterDisconnectedState
+  , connectMsgSubmitted
   , addError
   , addParsedMsg
   , addStderrMsg
+  , addUserMsg
   ) where
 
+import Control.Monad
 import qualified Data.Text as T
 
 import Data.GI.Base
-import qualified GI.Gtk as Gtk
 import qualified GI.GLib as GLib
+import qualified GI.Gtk as Gtk
 
 -- | Layout: expander -> box -> [ scrolled -> text view, entry ]
 data GdbWidget = GdbWidget
@@ -66,9 +69,19 @@ getGtkWidget = Gtk.toWidget . _gdbWidgetExpander
 enterConnectedState :: GdbWidget -> IO ()
 enterConnectedState w = set (_gdbWidgetEntry w) [ #sensitive := True ]
 
--- | Disables the entry
+-- | Disables the entry, resets the "msg submitted" callback.
 enterDisconnectedState :: GdbWidget -> IO ()
-enterDisconnectedState w = set (_gdbWidgetEntry w) [ #sensitive := False ]
+enterDisconnectedState GdbWidget{ _gdbWidgetEntry = entry } = do
+    set entry [ #sensitive := False ]
+    void (on entry #activate (return ()))
+
+connectMsgSubmitted :: GdbWidget -> (T.Text -> IO ()) -> IO ()
+connectMsgSubmitted GdbWidget{ _gdbWidgetEntry = entry } cb =
+    void $ on entry #activate $ do
+      t <- Gtk.entryGetText entry
+      unless (T.null t) $ do
+        Gtk.entrySetText entry ""
+        cb t
 
 addMsg :: GdbWidget -> T.Text -> T.Text -> IO ()
 addMsg w pfx msg = do
@@ -77,20 +90,14 @@ addMsg w pfx msg = do
     msg' <- GLib.markupEscapeText msg (-1)
     Gtk.textBufferInsertMarkup buf end_iter (pfx <> msg' <> "\n") (-1)
 
-errorPfx :: T.Text
-errorPfx = "<span color=\"red\">[ERROR]</span> "
-
 addError :: GdbWidget -> T.Text -> IO ()
-addError w msg = addMsg w errorPfx msg
-
-parsedPfx :: T.Text
-parsedPfx = "[PARSED] "
+addError w msg = addMsg w "<span color=\"red\">[ERROR]</span> " msg
 
 addParsedMsg :: GdbWidget -> T.Text -> IO ()
-addParsedMsg w msg = addMsg w parsedPfx msg
-
-stderrPfx :: T.Text
-stderrPfx = "<span color=\"red\">[STDERR]</span> "
+addParsedMsg w msg = addMsg w "[PARSED] " msg
 
 addStderrMsg :: GdbWidget -> T.Text -> IO ()
-addStderrMsg w msg = addMsg w stderrPfx msg
+addStderrMsg w msg = addMsg w "<span color=\"red\">[STDERR]</span> " msg
+
+addUserMsg :: GdbWidget -> T.Text -> IO ()
+addUserMsg w msg = addMsg w "[USER] " msg

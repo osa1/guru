@@ -78,11 +78,24 @@ parserTests =
                "fullname=\"/home/omer/haskell/ghc-gc/rts/RtsMain.c\",line=\"57\"}," <>
                "frame={level=\"4\",addr=\"0x0000000000405366\",func=\"main\"}]"
 
-    , testCase "OOB" $ do
+    , testCase "OOB or Result" $ do
         assertEqual "OOB 1"
           (Right (Gdb.OOB (Gdb.NotifyAsyncRecord (Gdb.AsyncRecord "thread-group-added" M.empty))))
           (parseOnly Gdb.parseResultOrOOB "=thread-group-added\n")
         assertEqual "OOB 2"
           (Right (Gdb.OOB (Gdb.NotifyAsyncRecord (Gdb.AsyncRecord "thread-group-added" (M.fromList [("id", Gdb.Const "i1")])))))
           (parseOnly Gdb.parseResultOrOOB "=thread-group-added,id=\"i1\"\n")
+        assertEqual "Result 1"
+          (Right (Gdb.Result Gdb.Done M.empty))
+          (parseOnly Gdb.parseResultOrOOB "^done\n")
+
+    , testCase "Class" $ do
+        assertEqual "Result class 1"
+          (Right Gdb.Done)
+          (parseOnly Gdb.parseClass "done")
+
+    , testCase "Full output" $ do
+        assertEqual "Full 1"
+          (Right [Gdb.Out Nothing (Gdb.Result Gdb.Done M.empty)])
+          (parseOnly Gdb.parse "^done\n(gdb) \n")
     ]

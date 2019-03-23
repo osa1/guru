@@ -77,7 +77,7 @@ parseClass = choice
 -- TODO: This silently carries on if we see a Var multiple times, which should
 -- not happen, but who knows, gdb is weird, and mi is buggy.
 parseVals :: Parser (M.Map Gdb.Var Gdb.Val)
-parseVals = M.fromList <$> many1 (char ',' >> parseResult)
+parseVals = M.fromList <$> many (char ',' >> parseResult)
 
 parseResult :: Parser (Gdb.Var, Gdb.Val)
 parseResult = do

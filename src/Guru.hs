@@ -52,7 +52,9 @@ activate app gdb_args = do
     GdbW.enterConnectedState gdb_widget
 
     _ <- forkIO $
-           (withProcess_ p (\p_ -> runGdbProcess p_ gdb_widget)
+           (withProcess_ p (\p_ -> do
+                               GdbW.connectMsgSubmitted gdb_widget (msgSubmitted gdb_widget (getStdin p_))
+                               runGdbProcess p_ gdb_widget)
               `finally` addIdle (GdbW.enterDisconnectedState gdb_widget))
               `catch` \(e :: ExitCodeException) ->
                           addIdle (GdbW.addError gdb_widget (T.pack (show e)))
@@ -61,6 +63,13 @@ activate app gdb_args = do
 
 addIdle :: IO () -> IO ()
 addIdle f = void (Gdk.threadsAddIdle GLib.PRIORITY_DEFAULT_IDLE (f >> return False))
+
+msgSubmitted :: GdbW.GdbWidget -> Handle -> T.Text -> IO ()
+msgSubmitted w h t = do
+    putStrLn ("msgSubmitted: " ++ show t)
+    T.hPutStrLn h t
+    hFlush h
+    GdbW.addUserMsg w t
 
 runGdbProcess :: Process Handle Handle Handle -> GdbW.GdbWidget -> IO ()
 runGdbProcess p w = do
@@ -72,11 +81,14 @@ gdbStdoutListener h w = loop (parse mempty)
   where
     parse = A.parse Gdb.parse
 
-    loop (A.Fail _unconsumed _ctx err) =
+    loop (A.Fail _unconsumed _ctx err) = do
       addIdle (GdbW.addError w (T.pack err))
+      addIdle (GdbW.addError w (T.pack (show _unconsumed)))
 
-    loop (A.Partial cont) =
-      BS.hGetSome h 10000 >>= loop . cont
+    loop (A.Partial cont) = do
+      bs <- BS.hGetSome h 10000
+      putStrLn ("Read: " ++ show bs)
+      loop (cont bs)
 
     loop (A.Done unconsumed ret) = do
       addIdle (forM_ ret (GdbW.addParsedMsg w . T.pack . show))
