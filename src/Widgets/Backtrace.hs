@@ -18,6 +18,7 @@ import qualified GI.Gtk as Gtk
 
 import Types (Backtrace (..), Frame (..))
 
+-- | Layout: just a TreeView
 data BacktraceW = BacktraceW
   { _backtraceWModel :: Gtk.ListStore
   , _backtraceWView  :: Gtk.TreeView
@@ -85,5 +86,7 @@ getColWidths bt_w = Gtk.treeViewGetColumns (_backtraceWView bt_w) >>= mapM Gtk.t
 setColWidths :: BacktraceW -> [Int32] -> IO ()
 setColWidths bt_w ws = do
     cols <- Gtk.treeViewGetColumns (_backtraceWView bt_w)
-    -- TODO: Make sure lengths are the same
+    -- Note that we deliberately accept different lengths here: we want to leave
+    -- the last column alone (it should take rest of the space after resizing
+    -- all other columns).
     zipWithM_ Gtk.treeViewColumnSetFixedWidth cols ws

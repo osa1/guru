@@ -3,6 +3,9 @@ module Types where
 import qualified Data.Text as T
 import Data.Word
 
+type ThreadId = Int
+type TargetId = T.Text
+
 type Backtrace = [Frame]
 
 data Frame = Frame

@@ -19,6 +19,7 @@ import qualified GI.Gtk as Gtk
 import qualified Gdb.Parser as Gdb
 import qualified Widgets.Gdb as GdbW
 import qualified Widgets.Backtrace as BtW
+import qualified Widgets.Threads as ThreadsW
 import Types
 
 run :: [String] -> IO ()
@@ -47,14 +48,19 @@ activate app gdb_args = do
     gdb_w' <- GdbW.getGtkWidget gdb_w
     Gtk.boxPackStart box gdb_w' True True 0
 
-    -- Create a backtrace widget (testing)
-    bt_w <- BtW.build []
-    bt_w' <- BtW.getGtkWidget bt_w
-    Gtk.boxPackStart box bt_w' True True 0
+    -- Create the threads widget
+    threads_w <- ThreadsW.build
+    threads_w' <- ThreadsW.getGtkWidget threads_w
+    Gtk.boxPackStart box threads_w' True True 0
 
     #showAll w
 
     _ <- forkIO (runGdb gdb_w gdb_args)
+
+    ThreadsW.addThread threads_w 123 "Some target"
+      []
+    ThreadsW.addThread threads_w 456 "Some other target"
+      []
 
     return ()
 
