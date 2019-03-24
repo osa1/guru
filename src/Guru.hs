@@ -18,6 +18,8 @@ import qualified GI.Gtk as Gtk
 
 import qualified Gdb.Parser as Gdb
 import qualified Widgets.Gdb as GdbW
+import qualified Widgets.Backtrace as BtW
+import Types
 
 run :: [String] -> IO ()
 run gdb_args = do
@@ -37,46 +39,62 @@ activate app gdb_args = do
       , #defaultWidth := 200
       ]
 
+    box <- new Gtk.Box [ #orientation := Gtk.OrientationVertical, #spacing := 0 ]
+    #add w box
+
     -- Create the GDB widget
-    gdb_widget <- GdbW.build
-    GdbW.getGtkWidget gdb_widget >>= #add w
+    gdb_w <- GdbW.build
+    gdb_w' <- GdbW.getGtkWidget gdb_w
+    Gtk.boxPackStart box gdb_w' True True 0
+
+    -- Create a backtrace widget (testing)
+    bt_w <- BtW.build []
+    bt_w' <- BtW.getGtkWidget bt_w
+    Gtk.boxPackStart box bt_w' True True 0
 
     #showAll w
 
-    -- Spawn a GDB process
-    let p = setStdin createPipe $
-            setStdout createPipe $
-            setStderr createPipe $
-            proc "gdb" (["-n", "-i=mi", "--args"] <> gdb_args)
-
-    GdbW.enterConnectedState gdb_widget
-
-    _ <- forkIO $
-           (withProcess_ p (\p_ -> do
-                               GdbW.connectMsgSubmitted gdb_widget (msgSubmitted gdb_widget (getStdin p_))
-                               runGdbProcess p_ gdb_widget)
-              `finally` addIdle (GdbW.enterDisconnectedState gdb_widget))
-              `catch` \(e :: ExitCodeException) ->
-                          addIdle (GdbW.addError gdb_widget (T.pack (show e)))
+    _ <- forkIO (runGdb gdb_w gdb_args)
 
     return ()
 
 addIdle :: IO () -> IO ()
 addIdle f = void (Gdk.threadsAddIdle GLib.PRIORITY_DEFAULT_IDLE (f >> return False))
 
-msgSubmitted :: GdbW.GdbWidget -> Handle -> T.Text -> IO ()
+-- | Runs a GDB process. DOES NOT fork a thread, but updates widgets with
+-- `addIdle`.
+runGdb :: GdbW.GdbW -> [String] -> IO ()
+runGdb gdb_w gdb_args = do
+    GdbW.enterConnectedState gdb_w
+
+    let
+      p = setStdin createPipe $
+          setStdout createPipe $
+          setStderr createPipe $
+          proc "gdb" (["-n", "-i=mi", "--args"] <> gdb_args)
+
+      after_p = addIdle (GdbW.enterDisconnectedState gdb_w)
+      exit_code_handler (e :: ExitCodeException) = addIdle (GdbW.addError gdb_w (T.pack (show e)))
+
+      go p_ = do
+        GdbW.connectMsgSubmitted gdb_w (msgSubmitted gdb_w (getStdin p_))
+        runGdbProcess p_ gdb_w
+
+    (withProcess_ p go `finally` after_p) `catch` exit_code_handler
+
+msgSubmitted :: GdbW.GdbW -> Handle -> T.Text -> IO ()
 msgSubmitted w h t = do
     putStrLn ("msgSubmitted: " ++ show t)
     T.hPutStrLn h t
     hFlush h
     GdbW.addUserMsg w t
 
-runGdbProcess :: Process Handle Handle Handle -> GdbW.GdbWidget -> IO ()
+runGdbProcess :: Process Handle Handle Handle -> GdbW.GdbW -> IO ()
 runGdbProcess p w = do
     _ <- forkIO (gdbStderrListener (getStderr p) w `finally` putStrLn "stderr listener returned")
     gdbStdoutListener (getStdout p) w `finally` putStrLn "stdout listener returned"
 
-gdbStdoutListener :: Handle -> GdbW.GdbWidget -> IO ()
+gdbStdoutListener :: Handle -> GdbW.GdbW -> IO ()
 gdbStdoutListener h w = loop (parse mempty)
   where
     parse = A.parse Gdb.parse
@@ -94,7 +112,7 @@ gdbStdoutListener h w = loop (parse mempty)
       addIdle (forM_ ret (GdbW.addParsedMsg w . T.pack . show))
       loop (parse unconsumed)
 
-gdbStderrListener :: Handle -> GdbW.GdbWidget -> IO ()
+gdbStderrListener :: Handle -> GdbW.GdbW -> IO ()
 gdbStderrListener h w = loop
   where
     -- TODO: When does this terminate?

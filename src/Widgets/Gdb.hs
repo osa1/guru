@@ -1,6 +1,6 @@
 -- | A test view for showing GDB output + entry for sending raw commands.
 module Widgets.Gdb
-  ( GdbWidget
+  ( GdbW
   , build
   , getGtkWidget
   , enterConnectedState
@@ -20,13 +20,13 @@ import qualified GI.GLib as GLib
 import qualified GI.Gtk as Gtk
 
 -- | Layout: expander -> box -> [ scrolled -> text view, entry ]
-data GdbWidget = GdbWidget
-  { _gdbWidgetExpander :: !Gtk.Expander
-  , _gdbWidgetTextView :: !Gtk.TextView
-  , _gdbWidgetEntry    :: !Gtk.Entry
+data GdbW = GdbW
+  { _gdbWExpander :: !Gtk.Expander
+  , _gdbWTextView :: !Gtk.TextView
+  , _gdbWEntry    :: !Gtk.Entry
   }
 
-build :: IO GdbWidget
+build :: IO GdbW
 build = do
     -- Create widgets
     expander <- new Gtk.Expander [ #label := "GDB", #expanded := True ]
@@ -56,48 +56,48 @@ build = do
     -- Add box to expander
     #add expander box
 
-    return GdbWidget
-      { _gdbWidgetExpander = expander
-      , _gdbWidgetTextView = text_view
-      , _gdbWidgetEntry = entry
+    return GdbW
+      { _gdbWExpander = expander
+      , _gdbWTextView = text_view
+      , _gdbWEntry = entry
       }
 
-getGtkWidget :: GdbWidget -> IO Gtk.Widget
-getGtkWidget = Gtk.toWidget . _gdbWidgetExpander
+getGtkWidget :: GdbW -> IO Gtk.Widget
+getGtkWidget = Gtk.toWidget . _gdbWExpander
 
 -- | Enables the entry
-enterConnectedState :: GdbWidget -> IO ()
-enterConnectedState w = set (_gdbWidgetEntry w) [ #sensitive := True ]
+enterConnectedState :: GdbW -> IO ()
+enterConnectedState w = set (_gdbWEntry w) [ #sensitive := True ]
 
 -- | Disables the entry, resets the "msg submitted" callback.
-enterDisconnectedState :: GdbWidget -> IO ()
-enterDisconnectedState GdbWidget{ _gdbWidgetEntry = entry } = do
+enterDisconnectedState :: GdbW -> IO ()
+enterDisconnectedState GdbW{ _gdbWEntry = entry } = do
     set entry [ #sensitive := False ]
     void (on entry #activate (return ()))
 
-connectMsgSubmitted :: GdbWidget -> (T.Text -> IO ()) -> IO ()
-connectMsgSubmitted GdbWidget{ _gdbWidgetEntry = entry } cb =
+connectMsgSubmitted :: GdbW -> (T.Text -> IO ()) -> IO ()
+connectMsgSubmitted GdbW{ _gdbWEntry = entry } cb =
     void $ on entry #activate $ do
       t <- Gtk.entryGetText entry
       unless (T.null t) $ do
         Gtk.entrySetText entry ""
         cb t
 
-addMsg :: GdbWidget -> T.Text -> T.Text -> IO ()
+addMsg :: GdbW -> T.Text -> T.Text -> IO ()
 addMsg w pfx msg = do
-    buf <- Gtk.textViewGetBuffer (_gdbWidgetTextView w)
+    buf <- Gtk.textViewGetBuffer (_gdbWTextView w)
     end_iter <- Gtk.textBufferGetEndIter buf
     msg' <- GLib.markupEscapeText msg (-1)
     Gtk.textBufferInsertMarkup buf end_iter (pfx <> msg' <> "\n") (-1)
 
-addError :: GdbWidget -> T.Text -> IO ()
+addError :: GdbW -> T.Text -> IO ()
 addError w msg = addMsg w "<span color=\"red\">[ERROR]</span> " msg
 
-addParsedMsg :: GdbWidget -> T.Text -> IO ()
+addParsedMsg :: GdbW -> T.Text -> IO ()
 addParsedMsg w msg = addMsg w "[PARSED] " msg
 
-addStderrMsg :: GdbWidget -> T.Text -> IO ()
+addStderrMsg :: GdbW -> T.Text -> IO ()
 addStderrMsg w msg = addMsg w "<span color=\"red\">[STDERR]</span> " msg
 
-addUserMsg :: GdbWidget -> T.Text -> IO ()
-addUserMsg w msg = addMsg w "[USER] " msg
+addUserMsg :: GdbW -> T.Text -> IO ()
+addUserMsg w msg = addMsg w "> [USER] " msg

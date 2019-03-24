@@ -17,9 +17,11 @@ library
     Gdb.Parser
     Gdb.Syntax
     Guru
+    Types
 
   other-modules:
     Gdb.Process
+    Gui
     Widgets.Gdb
 
   hs-source-dirs: src
