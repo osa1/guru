@@ -13,10 +13,9 @@ import qualified Data.Text as T
 import Data.Int
 
 import Data.GI.Base
-import qualified GI.GLib as GLib
 import qualified GI.Gtk as Gtk
 
-import Types (Backtrace (..), Frame (..))
+import Types (Backtrace, Frame (..))
 
 -- | Layout: just a TreeView
 data BacktraceW = BacktraceW

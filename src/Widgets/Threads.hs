@@ -13,7 +13,6 @@ import Data.List
 import qualified Data.Text as T
 
 import Data.GI.Base
-import qualified GI.GLib as GLib
 import qualified GI.Gtk as Gtk
 
 import Types

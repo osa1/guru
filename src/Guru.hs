@@ -5,6 +5,7 @@ import Control.Exception
 import Control.Monad
 import qualified Data.Attoparsec.ByteString as A
 import qualified Data.ByteString as BS
+import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import System.IO
@@ -17,10 +18,9 @@ import qualified GI.GLib as GLib
 import qualified GI.Gtk as Gtk
 
 import qualified Gdb.Parser as Gdb
+import qualified Gdb.Syntax as Gdb
 import qualified Widgets.Gdb as GdbW
-import qualified Widgets.Backtrace as BtW
 import qualified Widgets.Threads as ThreadsW
-import Types
 
 run :: [String] -> IO ()
 run gdb_args = do
@@ -103,6 +103,7 @@ runGdbProcess p w = do
 gdbStdoutListener :: Handle -> GdbW.GdbW -> IO ()
 gdbStdoutListener h w = loop (parse mempty)
   where
+    parse :: BS.ByteString -> A.Result [Gdb.Out]
     parse = A.parse Gdb.parse
 
     loop (A.Fail _unconsumed _ctx err) = do
@@ -111,12 +112,42 @@ gdbStdoutListener h w = loop (parse mempty)
 
     loop (A.Partial cont) = do
       bs <- BS.hGetSome h 10000
-      putStrLn ("Read: " ++ show bs)
+      -- putStrLn ("Read: " ++ show bs)
       loop (cont bs)
 
     loop (A.Done unconsumed ret) = do
-      addIdle (forM_ ret (GdbW.addParsedMsg w . T.pack . show))
+      addIdle (forM_ ret (handleGdbMsg w))
       loop (parse unconsumed)
+
+handleGdbMsg :: GdbW.GdbW -> Gdb.Out -> IO ()
+handleGdbMsg w (Gdb.Out _token msg) =
+    case msg of
+      Gdb.OOB (Gdb.ExecAsyncRecord async) ->
+        handleAsyncMsg async
+      Gdb.OOB (Gdb.StatusAsyncRecord async) ->
+        handleAsyncMsg async
+      Gdb.OOB (Gdb.NotifyAsyncRecord async) ->
+        handleAsyncMsg async
+      Gdb.OOB (Gdb.ConsoleStreamRecord msg') ->
+        GdbW.addConsoleStreamRecord w msg'
+      Gdb.OOB (Gdb.TargetStreamRecord msg') ->
+        GdbW.addTargetStreamRecord w msg'
+      Gdb.OOB (Gdb.LogStreamRecord msg') ->
+        GdbW.addLogStreamRecord w msg'
+      Gdb.Result cls vars ->
+        GdbW.addResultMsg w (T.pack (show cls)) (renderVarList (M.toList vars))
+  where
+    handleAsyncMsg _ = return ()
+
+renderVarList :: [(Gdb.Var, Gdb.Val)] -> T.Text
+-- TODO: Use a builder?
+renderVarList = T.intercalate ", " . map (\(var, val) -> var <> "=" <> renderVal val)
+
+renderVal :: Gdb.Val -> T.Text
+renderVal (Gdb.Const t) = t
+renderVal (Gdb.Tuple vars) = "{" <> renderVarList (M.toList vars) <> "}"
+renderVal (Gdb.ValList vals) = "[" <> T.intercalate "," (map renderVal vals) <> "]"
+renderVal (Gdb.ResList vars) = "[" <> renderVarList vars <> "]"
 
 gdbStderrListener :: Handle -> GdbW.GdbW -> IO ()
 gdbStderrListener h w = loop

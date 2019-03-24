@@ -10,6 +10,10 @@ module Widgets.Gdb
   , addParsedMsg
   , addStderrMsg
   , addUserMsg
+  , addConsoleStreamRecord
+  , addTargetStreamRecord
+  , addLogStreamRecord
+  , addResultMsg
   ) where
 
 import Control.Monad
@@ -91,13 +95,29 @@ addMsg w pfx msg = do
     Gtk.textBufferInsertMarkup buf end_iter (pfx <> msg' <> "\n") (-1)
 
 addError :: GdbW -> T.Text -> IO ()
-addError w msg = addMsg w "<span color=\"red\">[ERROR]</span> " msg
+addError w = addMsg w "<span color=\"red\">[ERROR]</span> "
 
 addParsedMsg :: GdbW -> T.Text -> IO ()
-addParsedMsg w msg = addMsg w "[PARSED] " msg
+addParsedMsg w = addMsg w "[PARSED] "
 
 addStderrMsg :: GdbW -> T.Text -> IO ()
-addStderrMsg w msg = addMsg w "<span color=\"red\">[STDERR]</span> " msg
+addStderrMsg w = addMsg w "<span color=\"red\">[STDERR]</span> "
 
 addUserMsg :: GdbW -> T.Text -> IO ()
-addUserMsg w msg = addMsg w "> [USER] " msg
+addUserMsg w = addMsg w "> [USER] "
+
+addConsoleStreamRecord :: GdbW -> T.Text -> IO ()
+addConsoleStreamRecord w = addMsg w "<span color=\"#A1D490\">[CONSOLE]</span> "
+
+addTargetStreamRecord :: GdbW -> T.Text -> IO ()
+addTargetStreamRecord w = addMsg w "<span color=\"#90C3D4\">[TARGET]</span> "
+
+addLogStreamRecord :: GdbW -> T.Text -> IO ()
+addLogStreamRecord w = addMsg w "<span color=\"#D4A190\">[LOG]</span> "
+
+addResultMsg
+    :: GdbW
+    -> T.Text -- ^ Class
+    -> T.Text -- ^ Msg body
+    -> IO ()
+addResultMsg w cls = addMsg w ("<span color=\"#6BDEB1\">[RESULT]</span> " <> cls <> ": ")
