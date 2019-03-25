@@ -37,7 +37,12 @@ data GdbW = GdbW
 build :: IO GdbW
 build = do
     -- Create widgets
-    expander <- new Gtk.Expander [ #label := "GDB", #expanded := True ]
+    expander <- new Gtk.Expander
+      [ #label := "GDB"
+      , #expanded := True
+      , #hexpand := True
+      , #vexpand := True
+      ]
     box <- new Gtk.Box [ #orientation := Gtk.OrientationVertical, #spacing := 0 ]
     scrolled <- new Gtk.ScrolledWindow
       [ #hscrollbarPolicy := Gtk.PolicyTypeAutomatic

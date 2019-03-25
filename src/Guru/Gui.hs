@@ -42,22 +42,22 @@ build app = do
     w <- new Gtk.ApplicationWindow
       [ #application := app
       , #title := "Guru"
-      , #defaultHeight := 200
-      , #defaultWidth := 200
+      , #defaultHeight := 800
+      , #defaultWidth := 800
       ]
 
-    box <- new Gtk.Box [ #orientation := Gtk.OrientationVertical, #spacing := 0 ]
-    #add w box
+    horiz <- new Gtk.Paned [ #orientation := Gtk.OrientationHorizontal ]
+    #add w horiz
 
     -- Create the GDB widget
     gdb_w <- GdbW.build
     gdb_w' <- GdbW.getGtkWidget gdb_w
-    Gtk.boxPackStart box gdb_w' True True 0
+    Gtk.panedPack1 horiz gdb_w' True True
 
     -- Create the threads widget
     threads_w <- ThreadsW.build
     threads_w' <- ThreadsW.getGtkWidget threads_w
-    Gtk.boxPackStart box threads_w' True True 0
+    Gtk.panedPack2 horiz threads_w' False True
 
     #showAll w
 
