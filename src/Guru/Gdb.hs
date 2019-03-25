@@ -7,9 +7,12 @@ module Guru.Gdb
   , spawn
   , sendRawMsg
   , getThreadInfo
+  , getThreadBacktrace
 
     -- * Message types
-  , ThreadInfo
+  , ThreadInfo (..)
+  , ThreadInfoThread (..)
+  , Backtrace
   ) where
 
 import Control.Concurrent
@@ -17,18 +20,18 @@ import Control.Exception
 import Control.Monad
 import qualified Data.Attoparsec.ByteString as A
 import qualified Data.ByteString as BS
+import qualified Data.IntMap.Strict as IM
 import Data.IORef
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
-import qualified Data.IntMap.Strict as IM
 import System.IO
 import System.Process.Typed
 
+import Gdb.Messages (Backtrace, ThreadInfo (..), ThreadInfoThread (..))
+import qualified Gdb.Messages as Gdb
 import qualified Gdb.Parser as Gdb
 import Gdb.Syntax
 import qualified Gdb.Syntax as Gdb
-import Gdb.Messages (ThreadInfo (..))
-import qualified Gdb.Messages as Gdb
 
 import Prelude hiding (log)
 
@@ -41,10 +44,10 @@ data Gdb = Gdb
 -}
 
 data Gdb = Gdb
-  { _gdbStdin :: !Handle
-  , _gdbToken :: !(IORef Int)
+  { _gdbStdin     :: !Handle
+  , _gdbToken     :: !(IORef Int)
   , _gdbCallbacks :: !(IORef (IM.IntMap (Gdb.ResultOrOOB -> IO ())))
-  , _gdbLogOut :: !GdbLogRawMsg
+  , _gdbLogOut    :: !GdbLogRawMsg
   }
 
 type GdbStdoutHandler = Gdb -> Gdb.ResultOrOOB -> IO ()
@@ -125,6 +128,9 @@ listenStderr h cb = loop
 getToken :: Gdb -> IO Int
 getToken gdb = atomicModifyIORef' (_gdbToken gdb) (\t -> (t+1, t))
 
+addCb :: Gdb -> Int -> (Gdb.ResultOrOOB -> IO ()) -> IO ()
+addCb gdb t cb = atomicModifyIORef' (_gdbCallbacks gdb) (\cbs -> (IM.insert t cb cbs, ()))
+
 --------------------------------------------------------------------------------
 -- * Sending messages to GDB
 
@@ -138,8 +144,16 @@ sendRawMsg gdb msg = do
 getThreadInfo :: Gdb -> (ThreadInfo -> IO ()) -> IO ()
 getThreadInfo gdb cb = do
     t <- getToken gdb
-    atomicModifyIORef' (_gdbCallbacks gdb) (\cbs -> (IM.insert t (handleThreadInfoRet cb) cbs, ()))
+    addCb gdb t (handleThreadInfoRet cb)
     sendRawMsg gdb (T.pack (show t) <> "-thread-info")
+
+-- | Request backtrace of thread with the given thread id. Sends a
+-- `-stack-list-frames` command.
+getThreadBacktrace :: Gdb -> Int -> (Backtrace -> IO ()) -> IO ()
+getThreadBacktrace gdb thread_id cb = do
+    t <- getToken gdb
+    addCb gdb t (handleStackListFramesRet cb)
+    sendRawMsg gdb (T.pack (show t) <> "-stack-list-frames --thread " <> T.pack (show thread_id))
 
 --------------------------------------------------------------------------------
 -- * Callback handling
@@ -150,5 +164,14 @@ handleThreadInfoRet cb msg = case msg of
       case Gdb.parseThreadInfo vals of
         Nothing -> hPutStrLn stderr ("Can't parse thread info ret: " ++ show vals)
         Just thread_info -> cb thread_info
+    _ ->
+      hPutStrLn stderr ("Unexpected thread info ret: " ++ show msg)
+
+handleStackListFramesRet :: (Backtrace -> IO ()) -> Gdb.ResultOrOOB -> IO ()
+handleStackListFramesRet cb msg = case msg of
+    Gdb.Result Gdb.Done vals ->
+      case Gdb.parseThreadBacktrace vals of
+        Nothing -> hPutStrLn stderr ("Can't parse thread backtrace ret: " ++ show vals)
+        Just bt -> cb bt
     _ ->
       hPutStrLn stderr ("Unexpected thread info ret: " ++ show msg)

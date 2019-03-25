@@ -16,7 +16,7 @@ data Frame = Frame
     -- | File name of the source file where the function lives.
   , _frameFile     :: Maybe T.Text
     -- | The full file name of the source file where the function lives.
-  , _frameFullName :: T.Text
+  , _frameFullName :: Maybe T.Text
     -- | Line number corresponding to the $pc.
   , _frameLine     :: Maybe Word
     -- | The shared library where this function is defined. This is only given

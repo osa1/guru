@@ -27,7 +27,7 @@ run gdb_args = do
 activate :: Gtk.Application -> [String] -> IO ()
 activate app gdb_args = do
     gui <- Gui.build app
-    gdb <- Gdb.spawn gdb_args (handleGdbMsg gui) (handleGdbStderr gui) (Gui.addRawOutMsg gui) (handleGdbExit gui)
+    gdb <- Gdb.spawn gdb_args (handleGdbMsg gui) (handleGdbStderr gui) (addIdle . Gui.addRawOutMsg gui) (handleGdbExit gui)
     Gui.enterConnectedState gui
     Gui.connectMsgSubmitted gui (msgSubmitted gui gdb)
 
@@ -46,25 +46,25 @@ msgSubmitted gui gdb msg = do
     -- addIdle (Gui.addUserMsg gui msg)
 
 handleGdbMsg :: Gui -> Gdb -> Gdb.ResultOrOOB -> IO ()
-handleGdbMsg w gdb msg =
+handleGdbMsg gui gdb msg =
     case msg of
       Gdb.OOB (Gdb.ExecAsyncRecord async) -> do
-        addIdle $ Gui.addExecMsg w (renderAsyncRecord async)
+        addIdle $ Gui.addExecMsg gui (renderAsyncRecord async)
         handleAsyncMsg async
       Gdb.OOB (Gdb.StatusAsyncRecord async) -> do
-        addIdle $ Gui.addStatusMsg w (renderAsyncRecord async)
+        addIdle $ Gui.addStatusMsg gui (renderAsyncRecord async)
         handleAsyncMsg async
       Gdb.OOB (Gdb.NotifyAsyncRecord async) -> do
-        addIdle $ Gui.addNotifyMsg w (renderAsyncRecord async)
+        addIdle $ Gui.addNotifyMsg gui (renderAsyncRecord async)
         handleAsyncMsg async
       Gdb.OOB (Gdb.ConsoleStreamRecord msg') ->
-        addIdle $ Gui.addConsoleStreamMsg w msg'
+        addIdle $ Gui.addConsoleStreamMsg gui msg'
       Gdb.OOB (Gdb.TargetStreamRecord msg') ->
-        addIdle $ Gui.addTargetStreamMsg w msg'
+        addIdle $ Gui.addTargetStreamMsg gui msg'
       Gdb.OOB (Gdb.LogStreamRecord msg') ->
-        addIdle $ Gui.addLogStreamMsg w msg'
+        addIdle $ Gui.addLogStreamMsg gui msg'
       Gdb.Result cls vars ->
-        addIdle $ Gui.addResultMsg w (T.pack (show cls)) (renderVarList (M.toList vars))
+        addIdle $ Gui.addResultMsg gui (T.pack (show cls)) (renderVarList (M.toList vars))
   where
     handleAsyncMsg :: Gdb.AsyncRecord -> IO ()
     handleAsyncMsg (Gdb.AsyncRecord cls res) = case cls of
@@ -75,7 +75,9 @@ handleGdbMsg w gdb msg =
       -- Execution stopped, update backtraces and expressions
       "stopped" -> do
         Gdb.getThreadInfo gdb $ \thread_info ->
-          putStrLn ("Got thread info: " ++ show thread_info)
+          forM_ (Gdb._threadInfoThreads thread_info) $ \(Gdb.ThreadInfoThread thread_id target_id) ->
+             Gdb.getThreadBacktrace gdb thread_id $
+               addIdle . Gui.addThread gui thread_id target_id
 
       _ -> return ()
 

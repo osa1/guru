@@ -4,6 +4,8 @@ module Guru.Gui
   , enterConnectedState
   , enterDisconnectedState
   , connectMsgSubmitted
+
+    -- * Rendering messages
   , addError
   , addParsedMsg
   , addStderrMsg
@@ -16,6 +18,9 @@ module Guru.Gui
   , addNotifyMsg
   , addResultMsg
   , addRawOutMsg
+
+    -- * Thread stuff
+  , addThread
   ) where
 
 import qualified Data.Text as T
@@ -25,6 +30,7 @@ import qualified GI.Gtk as Gtk
 
 import qualified Guru.Gui.Gdb as GdbW
 import qualified Guru.Gui.Threads as ThreadsW
+import Types
 
 data Gui = Gui
   { _gdb_w     :: GdbW.GdbW
@@ -98,3 +104,9 @@ addResultMsg = GdbW.addResultMsg . _gdb_w
 -- | Log a message from GURU to GDB.
 addRawOutMsg :: Gui -> T.Text -> IO ()
 addRawOutMsg = GdbW.addRawOutMsg . _gdb_w
+
+--------------------------------------------------------------------------------
+-- * Backtrace stuff
+
+addThread :: Gui -> ThreadId -> TargetId -> Backtrace -> IO ()
+addThread = ThreadsW.addThread . _threads_w
