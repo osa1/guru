@@ -28,6 +28,7 @@ import qualified Data.Text as T
 import Data.GI.Base
 import qualified GI.Gtk as Gtk
 
+import qualified Guru.Gui.Expressions as ExprW
 import qualified Guru.Gui.Gdb as GdbW
 import qualified Guru.Gui.Threads as ThreadsW
 import Types
@@ -35,6 +36,7 @@ import Types
 data Gui = Gui
   { _gdb_w     :: !GdbW.GdbW
   , _threads_w :: !ThreadsW.ThreadsW
+  , _expr_w    :: !ExprW.ExprW
   }
 
 build :: Gtk.Application -> IO Gui
@@ -49,10 +51,18 @@ build app = do
     horiz <- new Gtk.Paned [ #orientation := Gtk.OrientationHorizontal ]
     #add w horiz
 
+    vert <- new Gtk.Paned [ #orientation := Gtk.OrientationVertical ]
+    Gtk.panedPack1 horiz vert True True
+
     -- Create the GDB widget
     gdb_w <- GdbW.build
     gdb_w' <- GdbW.getGtkWidget gdb_w
-    Gtk.panedPack1 horiz gdb_w' True True
+    Gtk.panedPack1 vert gdb_w' True True
+
+    -- Create the expressions widget
+    expr_w <- ExprW.build
+    expr_w' <- ExprW.getGtkWidget expr_w
+    Gtk.panedPack2 vert expr_w' False True
 
     -- Create the threads widget
     threads_w <- ThreadsW.build
@@ -61,7 +71,7 @@ build app = do
 
     #showAll w
 
-    return (Gui gdb_w threads_w)
+    return (Gui gdb_w threads_w expr_w)
 
 enterConnectedState :: Gui -> IO ()
 enterConnectedState = GdbW.enterConnectedState . _gdb_w
