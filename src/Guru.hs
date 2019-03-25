@@ -19,8 +19,8 @@ import qualified GI.Gtk as Gtk
 
 import qualified Gdb.Parser as Gdb
 import qualified Gdb.Syntax as Gdb
-import qualified Widgets.Gdb as GdbW
-import qualified Widgets.Threads as ThreadsW
+import qualified Guru.Gui as Gui
+import Guru.Gui (Gui)
 
 run :: [String] -> IO ()
 run gdb_args = do
@@ -33,35 +33,8 @@ run gdb_args = do
 
 activate :: Gtk.Application -> [String] -> IO ()
 activate app gdb_args = do
-    w <- new Gtk.ApplicationWindow
-      [ #application := app
-      , #title := "Guru"
-      , #defaultHeight := 200
-      , #defaultWidth := 200
-      ]
-
-    box <- new Gtk.Box [ #orientation := Gtk.OrientationVertical, #spacing := 0 ]
-    #add w box
-
-    -- Create the GDB widget
-    gdb_w <- GdbW.build
-    gdb_w' <- GdbW.getGtkWidget gdb_w
-    Gtk.boxPackStart box gdb_w' True True 0
-
-    -- Create the threads widget
-    threads_w <- ThreadsW.build
-    threads_w' <- ThreadsW.getGtkWidget threads_w
-    Gtk.boxPackStart box threads_w' True True 0
-
-    #showAll w
-
-    _ <- forkIO (runGdb gdb_w gdb_args)
-
-    ThreadsW.addThread threads_w 123 "Some target"
-      []
-    ThreadsW.addThread threads_w 456 "Some other target"
-      []
-
+    gui <- Gui.build app
+    _ <- forkIO (runGdb gui gdb_args)
     return ()
 
 addIdle :: IO () -> IO ()
@@ -69,9 +42,9 @@ addIdle f = void (Gdk.threadsAddIdle GLib.PRIORITY_DEFAULT_IDLE (f >> return Fal
 
 -- | Runs a GDB process. DOES NOT fork a thread, but updates widgets with
 -- `addIdle`.
-runGdb :: GdbW.GdbW -> [String] -> IO ()
-runGdb gdb_w gdb_args = do
-    GdbW.enterConnectedState gdb_w
+runGdb :: Gui -> [String] -> IO ()
+runGdb gui gdb_args = do
+    Gui.enterConnectedState gui
 
     let
       p = setStdin createPipe $
@@ -79,36 +52,36 @@ runGdb gdb_w gdb_args = do
           setStderr createPipe $
           proc "gdb" (["-n", "-i=mi", "--args"] <> gdb_args)
 
-      after_p = addIdle (GdbW.enterDisconnectedState gdb_w)
-      exit_code_handler (e :: ExitCodeException) = addIdle (GdbW.addError gdb_w (T.pack (show e)))
+      after_p = addIdle (Gui.enterDisconnectedState gui)
+      exit_code_handler (e :: ExitCodeException) = addIdle (Gui.addError gui (T.pack (show e)))
 
       go p_ = do
-        GdbW.connectMsgSubmitted gdb_w (msgSubmitted gdb_w (getStdin p_))
-        runGdbProcess p_ gdb_w
+        Gui.connectMsgSubmitted gui (msgSubmitted gui (getStdin p_))
+        runGdbProcess p_ gui
 
     (withProcess_ p go `finally` after_p) `catch` exit_code_handler
 
-msgSubmitted :: GdbW.GdbW -> Handle -> T.Text -> IO ()
+msgSubmitted :: Gui -> Handle -> T.Text -> IO ()
 msgSubmitted w h t = do
     putStrLn ("msgSubmitted: " ++ show t)
     T.hPutStrLn h t
     hFlush h
-    GdbW.addUserMsg w t
+    Gui.addUserMsg w t
 
-runGdbProcess :: Process Handle Handle Handle -> GdbW.GdbW -> IO ()
+runGdbProcess :: Process Handle Handle Handle -> Gui -> IO ()
 runGdbProcess p w = do
     _ <- forkIO (gdbStderrListener (getStderr p) w `finally` putStrLn "stderr listener returned")
     gdbStdoutListener (getStdout p) w `finally` putStrLn "stdout listener returned"
 
-gdbStdoutListener :: Handle -> GdbW.GdbW -> IO ()
+gdbStdoutListener :: Handle -> Gui -> IO ()
 gdbStdoutListener h w = loop (parse mempty)
   where
     parse :: BS.ByteString -> A.Result [Gdb.Out]
     parse = A.parse Gdb.parse
 
     loop (A.Fail _unconsumed _ctx err) = do
-      addIdle (GdbW.addError w (T.pack err))
-      addIdle (GdbW.addError w (T.pack (show _unconsumed)))
+      addIdle (Gui.addError w (T.pack err))
+      addIdle (Gui.addError w (T.pack (show _unconsumed)))
 
     loop (A.Partial cont) = do
       bs <- BS.hGetSome h 10000
@@ -119,29 +92,28 @@ gdbStdoutListener h w = loop (parse mempty)
       addIdle (forM_ ret (handleGdbMsg w))
       loop (parse unconsumed)
 
-handleGdbMsg :: GdbW.GdbW -> Gdb.Out -> IO ()
+handleGdbMsg :: Gui -> Gdb.Out -> IO ()
 handleGdbMsg w (Gdb.Out _token msg) =
     case msg of
       Gdb.OOB (Gdb.ExecAsyncRecord async) -> do
-        GdbW.addExecMsg w (renderAsyncRecord async)
+        Gui.addExecMsg w (renderAsyncRecord async)
         handleAsyncMsg async
       Gdb.OOB (Gdb.StatusAsyncRecord async) -> do
-        GdbW.addStatusMsg w (renderAsyncRecord async)
+        Gui.addStatusMsg w (renderAsyncRecord async)
         handleAsyncMsg async
       Gdb.OOB (Gdb.NotifyAsyncRecord async) -> do
-        GdbW.addNotifyMsg w (renderAsyncRecord async)
+        Gui.addNotifyMsg w (renderAsyncRecord async)
         handleAsyncMsg async
       Gdb.OOB (Gdb.ConsoleStreamRecord msg') ->
-        GdbW.addConsoleStreamMsg w msg'
+        Gui.addConsoleStreamMsg w msg'
       Gdb.OOB (Gdb.TargetStreamRecord msg') ->
-        GdbW.addTargetStreamMsg w msg'
+        Gui.addTargetStreamMsg w msg'
       Gdb.OOB (Gdb.LogStreamRecord msg') ->
-        GdbW.addLogStreamMsg w msg'
+        Gui.addLogStreamMsg w msg'
       Gdb.Result cls vars ->
-        GdbW.addResultMsg w (T.pack (show cls)) (renderVarList (M.toList vars))
+        Gui.addResultMsg w (T.pack (show cls)) (renderVarList (M.toList vars))
   where
     handleAsyncMsg :: Gdb.AsyncRecord -> IO ()
-
     handleAsyncMsg (Gdb.AsyncRecord cls res) = case cls of
       -- Breakpoint messages: refresh breakpoints
       "breakpoint-created" ->
@@ -175,11 +147,11 @@ renderAsyncRecord (Gdb.AsyncRecord cls res)
   | otherwise
   = cls <> ": " <> renderVarList (M.toList res)
 
-gdbStderrListener :: Handle -> GdbW.GdbW -> IO ()
+gdbStderrListener :: Handle -> Gui -> IO ()
 gdbStderrListener h w = loop
   where
     -- TODO: When does this terminate?
     loop = do
       err <- T.hGetLine h
-      addIdle (GdbW.addStderrMsg w err)
+      addIdle (Gui.addStderrMsg w err)
       loop

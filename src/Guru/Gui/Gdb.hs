@@ -1,5 +1,5 @@
 -- | A test view for showing GDB output + entry for sending raw commands.
-module Widgets.Gdb
+module Guru.Gui.Gdb
   ( GdbW
   , build
   , getGtkWidget

@@ -1,5 +1,5 @@
 -- | A scrolled window of backtraces.
-module Widgets.Threads
+module Guru.Gui.Threads
   ( ThreadsW
   , build
   , getGtkWidget
@@ -15,8 +15,8 @@ import qualified Data.Text as T
 import Data.GI.Base
 import qualified GI.Gtk as Gtk
 
+import qualified Guru.Gui.Backtrace as BtW
 import Types
-import qualified Widgets.Backtrace as BtW
 
 -- | Layout: scrolled -> box -> [expander -> BacktraceW]
 data ThreadsW = ThreadsW

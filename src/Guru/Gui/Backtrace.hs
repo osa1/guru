@@ -1,6 +1,6 @@
 -- | A list view to show backtraces. This widget can't be updated -- destroy and
 -- build again to update.
-module Widgets.Backtrace
+module Guru.Gui.Backtrace
   ( BacktraceW
   , build
   , getGtkWidget

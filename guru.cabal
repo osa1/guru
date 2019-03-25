@@ -22,10 +22,10 @@ library
 
   other-modules:
     Gdb.Process
-    Gui
-    Widgets.Backtrace
-    Widgets.Gdb
-    Widgets.Threads
+    Guru.Gui
+    Guru.Gui.Backtrace
+    Guru.Gui.Gdb
+    Guru.Gui.Threads
 
   hs-source-dirs: src
 
