@@ -20,9 +20,9 @@ import Types
 
 -- | Layout: scrolled -> box -> [expander -> BacktraceW]
 data ThreadsW = ThreadsW
-  { _threadsWScrolledWindow :: Gtk.ScrolledWindow
-  , _threadsWBox            :: Gtk.Box
-  , _threadsWThreads        :: IORef [BtW.BacktraceW]
+  { _threadsWScrolledWindow :: !Gtk.ScrolledWindow
+  , _threadsWBox            :: !Gtk.Box
+  , _threadsWThreads        :: !(IORef [BtW.BacktraceW])
   }
 
 build :: IO ThreadsW

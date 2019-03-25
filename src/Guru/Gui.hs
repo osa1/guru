@@ -33,8 +33,8 @@ import qualified Guru.Gui.Threads as ThreadsW
 import Types
 
 data Gui = Gui
-  { _gdb_w     :: GdbW.GdbW
-  , _threads_w :: ThreadsW.ThreadsW
+  { _gdb_w     :: !GdbW.GdbW
+  , _threads_w :: !ThreadsW.ThreadsW
   }
 
 build :: Gtk.Application -> IO Gui

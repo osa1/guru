@@ -19,8 +19,8 @@ import Types (Backtrace, Frame (..))
 
 -- | Layout: just a TreeView
 data BacktraceW = BacktraceW
-  { _backtraceWModel :: Gtk.ListStore
-  , _backtraceWView  :: Gtk.TreeView
+  { _backtraceWModel :: !Gtk.ListStore
+  , _backtraceWView  :: !Gtk.TreeView
   }
 
 colTypes :: [GType]
