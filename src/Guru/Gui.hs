@@ -15,6 +15,7 @@ module Guru.Gui
   , addStatusMsg
   , addNotifyMsg
   , addResultMsg
+  , addRawOutMsg
   ) where
 
 import qualified Data.Text as T
@@ -93,3 +94,7 @@ addResultMsg
     -> T.Text -- ^ Msg body. May be empty.
     -> IO ()
 addResultMsg = GdbW.addResultMsg . _gdb_w
+
+-- | Log a message from GURU to GDB.
+addRawOutMsg :: Gui -> T.Text -> IO ()
+addRawOutMsg = GdbW.addRawOutMsg . _gdb_w

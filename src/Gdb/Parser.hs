@@ -44,7 +44,7 @@ parse = do
 parseOut :: Parser Gdb.Out
 parseOut = Gdb.Out <$> optional parseToken <*> parseResultOrOOB
 
-parseToken :: Parser Word64
+parseToken :: Parser Int
 parseToken = read <$> many1 digit
 
 parseResultOrOOB :: Parser Gdb.ResultOrOOB

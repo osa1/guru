@@ -27,7 +27,7 @@ run gdb_args = do
 activate :: Gtk.Application -> [String] -> IO ()
 activate app gdb_args = do
     gui <- Gui.build app
-    gdb <- Gdb.spawn gdb_args (handleGdbMsg gui) (handleGdbStderr gui) (handleGdbExit gui)
+    gdb <- Gdb.spawn gdb_args (handleGdbMsg gui) (handleGdbStderr gui) (Gui.addRawOutMsg gui) (handleGdbExit gui)
     Gui.enterConnectedState gui
     Gui.connectMsgSubmitted gui (msgSubmitted gui gdb)
 
@@ -43,10 +43,10 @@ handleGdbExit = addIdle . Gui.enterDisconnectedState
 msgSubmitted :: Gui -> Gdb -> T.Text -> IO ()
 msgSubmitted gui gdb msg = do
     Gdb.sendRawMsg gdb msg
-    addIdle (Gui.addUserMsg gui msg)
+    -- addIdle (Gui.addUserMsg gui msg)
 
-handleGdbMsg :: Gui -> Gdb -> Gdb.Out -> IO ()
-handleGdbMsg w _gdb (Gdb.Out _token msg) =
+handleGdbMsg :: Gui -> Gdb -> Gdb.ResultOrOOB -> IO ()
+handleGdbMsg w gdb msg =
     case msg of
       Gdb.OOB (Gdb.ExecAsyncRecord async) -> do
         addIdle $ Gui.addExecMsg w (renderAsyncRecord async)
@@ -73,9 +73,9 @@ handleGdbMsg w _gdb (Gdb.Out _token msg) =
       "breakpoint-modified" -> handleBpMsg res
 
       -- Execution stopped, update backtraces and expressions
-      "stopped" ->
-
-        return ()
+      "stopped" -> do
+        Gdb.getThreadInfo gdb $ \thread_info ->
+          putStrLn ("Got thread info: " ++ show thread_info)
 
       _ -> return ()
 

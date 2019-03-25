@@ -17,6 +17,7 @@ module Guru.Gui.Gdb
   , addStatusMsg
   , addNotifyMsg
   , addResultMsg
+  , addRawOutMsg
   ) where
 
 import Control.Monad
@@ -136,3 +137,7 @@ addResultMsg w cls msg =
     addMsg w
       ("<span color=\"#6BDEB1\">[RESULT]</span> " <> cls <> if T.null msg then mempty else ": ")
       msg
+
+-- | Log a message from GURU to GDB.
+addRawOutMsg :: GdbW -> T.Text -> IO ()
+addRawOutMsg w = addMsg w "[GURU->GDB] "

@@ -1,9 +1,11 @@
+{-# LANGUAGE TemplateHaskell #-}
+
 -- | This module defines GDB output syntax.
 module Gdb.Syntax where
 
+import Control.Lens
 import qualified Data.Map as M
 import qualified Data.Text as T
-import Data.Word
 
 type Var = T.Text
 
@@ -14,9 +16,11 @@ data Val
   | ResList ![(Var, Val)] -- Deliberately NOT a map!
   deriving (Show, Eq)
 
+makePrisms ''Val
+
 data Out = Out
-  { _outToken :: !(Maybe Word64)
-  , _outData :: !ResultOrOOB
+  { _outToken :: !(Maybe Int)
+  , _outData  :: !ResultOrOOB
   } deriving (Show, Eq)
 
 data ResultOrOOB
@@ -42,6 +46,6 @@ data OOBResult
   deriving (Show, Eq)
 
 data AsyncRecord = AsyncRecord
-  { _asyncRecordClass :: !T.Text -- TODO: This is different than ResultClass?
+  { _asyncRecordClass   :: !T.Text -- TODO: This is different than ResultClass?
   , _asyncRecordResults :: !(M.Map Var Val)
   } deriving (Show, Eq)
