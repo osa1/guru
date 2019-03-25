@@ -63,8 +63,7 @@ spawn args handle_msg log exit_cb = do
     handleProc stdin_ref p = do
       putMVar stdin_ref (getStdin p)
       _ <- forkIO (listenStdout (getStdout p) (Gdb (getStdin p)) handle_msg)
-      _ <- forkIO (listenStderr (getStderr p) log)
-      return ()
+      listenStderr (getStderr p) log
 
     exit_code_handler :: ExitCodeException -> IO ()
     exit_code_handler e = log ("GDB returned non-0: " <> T.pack (show e))

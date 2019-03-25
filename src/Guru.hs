@@ -28,6 +28,7 @@ activate :: Gtk.Application -> [String] -> IO ()
 activate app gdb_args = do
     gui <- Gui.build app
     gdb <- Gdb.spawn gdb_args (handleGdbMsg gui) (handleGdbStderr gui) (handleGdbExit gui)
+    Gui.enterConnectedState gui
     Gui.connectMsgSubmitted gui (msgSubmitted gui gdb)
 
 addIdle :: IO () -> IO ()
@@ -37,33 +38,33 @@ handleGdbStderr :: Gui -> T.Text -> IO ()
 handleGdbStderr gui = addIdle . Gui.addStderrMsg gui
 
 handleGdbExit :: Gui -> IO ()
-handleGdbExit = Gui.enterDisconnectedState
+handleGdbExit = addIdle . Gui.enterDisconnectedState
 
 msgSubmitted :: Gui -> Gdb -> T.Text -> IO ()
 msgSubmitted gui gdb msg = do
     Gdb.sendRawMsg gdb msg
-    Gui.addUserMsg gui msg
+    addIdle (Gui.addUserMsg gui msg)
 
 handleGdbMsg :: Gui -> Gdb -> Gdb.Out -> IO ()
 handleGdbMsg w _gdb (Gdb.Out _token msg) =
     case msg of
       Gdb.OOB (Gdb.ExecAsyncRecord async) -> do
-        Gui.addExecMsg w (renderAsyncRecord async)
+        addIdle $ Gui.addExecMsg w (renderAsyncRecord async)
         handleAsyncMsg async
       Gdb.OOB (Gdb.StatusAsyncRecord async) -> do
-        Gui.addStatusMsg w (renderAsyncRecord async)
+        addIdle $ Gui.addStatusMsg w (renderAsyncRecord async)
         handleAsyncMsg async
       Gdb.OOB (Gdb.NotifyAsyncRecord async) -> do
-        Gui.addNotifyMsg w (renderAsyncRecord async)
+        addIdle $ Gui.addNotifyMsg w (renderAsyncRecord async)
         handleAsyncMsg async
       Gdb.OOB (Gdb.ConsoleStreamRecord msg') ->
-        Gui.addConsoleStreamMsg w msg'
+        addIdle $ Gui.addConsoleStreamMsg w msg'
       Gdb.OOB (Gdb.TargetStreamRecord msg') ->
-        Gui.addTargetStreamMsg w msg'
+        addIdle $ Gui.addTargetStreamMsg w msg'
       Gdb.OOB (Gdb.LogStreamRecord msg') ->
-        Gui.addLogStreamMsg w msg'
+        addIdle $ Gui.addLogStreamMsg w msg'
       Gdb.Result cls vars ->
-        Gui.addResultMsg w (T.pack (show cls)) (renderVarList (M.toList vars))
+        addIdle $ Gui.addResultMsg w (T.pack (show cls)) (renderVarList (M.toList vars))
   where
     handleAsyncMsg :: Gdb.AsyncRecord -> IO ()
     handleAsyncMsg (Gdb.AsyncRecord cls res) = case cls of
