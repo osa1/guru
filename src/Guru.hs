@@ -1,15 +1,8 @@
 module Guru (run) where
 
-import Control.Concurrent
-import Control.Exception
 import Control.Monad
-import qualified Data.Attoparsec.ByteString as A
-import qualified Data.ByteString as BS
 import qualified Data.Map as M
 import qualified Data.Text as T
-import qualified Data.Text.IO as T
-import System.IO
-import System.Process.Typed
 
 import Data.GI.Base
 import qualified GI.Gdk as Gdk
@@ -17,10 +10,10 @@ import qualified GI.Gio as Gio
 import qualified GI.GLib as GLib
 import qualified GI.Gtk as Gtk
 
-import qualified Gdb.Parser as Gdb
-import qualified Gdb.Syntax as Gdb
-import qualified Guru.Gui as Gui
+import Guru.Gdb (Gdb)
+import qualified Guru.Gdb as Gdb
 import Guru.Gui (Gui)
+import qualified Guru.Gui as Gui
 
 run :: [String] -> IO ()
 run gdb_args = do
@@ -34,66 +27,25 @@ run gdb_args = do
 activate :: Gtk.Application -> [String] -> IO ()
 activate app gdb_args = do
     gui <- Gui.build app
-    _ <- forkIO (runGdb gui gdb_args)
-    return ()
+    gdb <- Gdb.spawn gdb_args (handleGdbMsg gui) (handleGdbStderr gui) (handleGdbExit gui)
+    Gui.connectMsgSubmitted gui (msgSubmitted gui gdb)
 
 addIdle :: IO () -> IO ()
 addIdle f = void (Gdk.threadsAddIdle GLib.PRIORITY_DEFAULT_IDLE (f >> return False))
 
--- | Runs a GDB process. DOES NOT fork a thread, but updates widgets with
--- `addIdle`.
-runGdb :: Gui -> [String] -> IO ()
-runGdb gui gdb_args = do
-    Gui.enterConnectedState gui
+handleGdbStderr :: Gui -> T.Text -> IO ()
+handleGdbStderr gui = addIdle . Gui.addStderrMsg gui
 
-    let
-      p = setStdin createPipe $
-          setStdout createPipe $
-          setStderr createPipe $
-          proc "gdb" (["-n", "-i=mi", "--args"] <> gdb_args)
+handleGdbExit :: Gui -> IO ()
+handleGdbExit = Gui.enterDisconnectedState
 
-      after_p = addIdle (Gui.enterDisconnectedState gui)
-      exit_code_handler (e :: ExitCodeException) = addIdle (Gui.addError gui (T.pack (show e)))
+msgSubmitted :: Gui -> Gdb -> T.Text -> IO ()
+msgSubmitted gui gdb msg = do
+    Gdb.sendRawMsg gdb msg
+    Gui.addUserMsg gui msg
 
-      go p_ = do
-        Gui.connectMsgSubmitted gui (msgSubmitted gui (getStdin p_))
-        runGdbProcess p_ gui
-
-    (withProcess_ p go `finally` after_p) `catch` exit_code_handler
-
-msgSubmitted :: Gui -> Handle -> T.Text -> IO ()
-msgSubmitted w h t = do
-    putStrLn ("msgSubmitted: " ++ show t)
-    T.hPutStrLn h t
-    hFlush h
-    Gui.addUserMsg w t
-
-runGdbProcess :: Process Handle Handle Handle -> Gui -> IO ()
-runGdbProcess p w = do
-    _ <- forkIO (gdbStderrListener (getStderr p) w `finally` putStrLn "stderr listener returned")
-    gdbStdoutListener (getStdout p) w `finally` putStrLn "stdout listener returned"
-
-gdbStdoutListener :: Handle -> Gui -> IO ()
-gdbStdoutListener h w = loop (parse mempty)
-  where
-    parse :: BS.ByteString -> A.Result [Gdb.Out]
-    parse = A.parse Gdb.parse
-
-    loop (A.Fail _unconsumed _ctx err) = do
-      addIdle (Gui.addError w (T.pack err))
-      addIdle (Gui.addError w (T.pack (show _unconsumed)))
-
-    loop (A.Partial cont) = do
-      bs <- BS.hGetSome h 10000
-      -- putStrLn ("Read: " ++ show bs)
-      loop (cont bs)
-
-    loop (A.Done unconsumed ret) = do
-      addIdle (forM_ ret (handleGdbMsg w))
-      loop (parse unconsumed)
-
-handleGdbMsg :: Gui -> Gdb.Out -> IO ()
-handleGdbMsg w (Gdb.Out _token msg) =
+handleGdbMsg :: Gui -> Gdb -> Gdb.Out -> IO ()
+handleGdbMsg w _gdb (Gdb.Out _token msg) =
     case msg of
       Gdb.OOB (Gdb.ExecAsyncRecord async) -> do
         Gui.addExecMsg w (renderAsyncRecord async)
@@ -116,19 +68,18 @@ handleGdbMsg w (Gdb.Out _token msg) =
     handleAsyncMsg :: Gdb.AsyncRecord -> IO ()
     handleAsyncMsg (Gdb.AsyncRecord cls res) = case cls of
       -- Breakpoint messages: refresh breakpoints
-      "breakpoint-created" ->
-        -- handleBpMsg res
-        return ()
-      "breakpoint-modified" ->
-        -- handleBpMsg res
-        return ()
+      "breakpoint-created" -> handleBpMsg res
+      "breakpoint-modified" -> handleBpMsg res
 
-      -- This is where we refresh backtraces and expressions
+      -- Execution stopped, update backtraces and expressions
       "stopped" ->
-        -- handleStoppedMsg res
+
         return ()
 
       _ -> return ()
+
+    handleBpMsg :: M.Map Gdb.Var Gdb.Val -> IO ()
+    handleBpMsg _msg = return ()
 
 renderVarList :: [(Gdb.Var, Gdb.Val)] -> T.Text
 -- TODO: Use a builder?
@@ -146,12 +97,3 @@ renderAsyncRecord (Gdb.AsyncRecord cls res)
   = cls
   | otherwise
   = cls <> ": " <> renderVarList (M.toList res)
-
-gdbStderrListener :: Handle -> Gui -> IO ()
-gdbStderrListener h w = loop
-  where
-    -- TODO: When does this terminate?
-    loop = do
-      err <- T.hGetLine h
-      addIdle (Gui.addStderrMsg w err)
-      loop
