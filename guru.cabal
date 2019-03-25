@@ -21,7 +21,6 @@ library
     Types
 
   other-modules:
-    Gdb.Process
     Guru.Gdb
     Guru.Gui
     Guru.Gui.Backtrace
