@@ -122,22 +122,41 @@ gdbStdoutListener h w = loop (parse mempty)
 handleGdbMsg :: GdbW.GdbW -> Gdb.Out -> IO ()
 handleGdbMsg w (Gdb.Out _token msg) =
     case msg of
-      Gdb.OOB (Gdb.ExecAsyncRecord async) ->
+      Gdb.OOB (Gdb.ExecAsyncRecord async) -> do
+        GdbW.addExecMsg w (renderAsyncRecord async)
         handleAsyncMsg async
-      Gdb.OOB (Gdb.StatusAsyncRecord async) ->
+      Gdb.OOB (Gdb.StatusAsyncRecord async) -> do
+        GdbW.addStatusMsg w (renderAsyncRecord async)
         handleAsyncMsg async
-      Gdb.OOB (Gdb.NotifyAsyncRecord async) ->
+      Gdb.OOB (Gdb.NotifyAsyncRecord async) -> do
+        GdbW.addNotifyMsg w (renderAsyncRecord async)
         handleAsyncMsg async
       Gdb.OOB (Gdb.ConsoleStreamRecord msg') ->
-        GdbW.addConsoleStreamRecord w msg'
+        GdbW.addConsoleStreamMsg w msg'
       Gdb.OOB (Gdb.TargetStreamRecord msg') ->
-        GdbW.addTargetStreamRecord w msg'
+        GdbW.addTargetStreamMsg w msg'
       Gdb.OOB (Gdb.LogStreamRecord msg') ->
-        GdbW.addLogStreamRecord w msg'
+        GdbW.addLogStreamMsg w msg'
       Gdb.Result cls vars ->
         GdbW.addResultMsg w (T.pack (show cls)) (renderVarList (M.toList vars))
   where
-    handleAsyncMsg _ = return ()
+    handleAsyncMsg :: Gdb.AsyncRecord -> IO ()
+
+    handleAsyncMsg (Gdb.AsyncRecord cls res) = case cls of
+      -- Breakpoint messages: refresh breakpoints
+      "breakpoint-created" ->
+        -- handleBpMsg res
+        return ()
+      "breakpoint-modified" ->
+        -- handleBpMsg res
+        return ()
+
+      -- This is where we refresh backtraces and expressions
+      "stopped" ->
+        -- handleStoppedMsg res
+        return ()
+
+      _ -> return ()
 
 renderVarList :: [(Gdb.Var, Gdb.Val)] -> T.Text
 -- TODO: Use a builder?
@@ -148,6 +167,13 @@ renderVal (Gdb.Const t) = t
 renderVal (Gdb.Tuple vars) = "{" <> renderVarList (M.toList vars) <> "}"
 renderVal (Gdb.ValList vals) = "[" <> T.intercalate "," (map renderVal vals) <> "]"
 renderVal (Gdb.ResList vars) = "[" <> renderVarList vars <> "]"
+
+renderAsyncRecord :: Gdb.AsyncRecord -> T.Text
+renderAsyncRecord (Gdb.AsyncRecord cls res)
+  | M.null res
+  = cls
+  | otherwise
+  = cls <> ": " <> renderVarList (M.toList res)
 
 gdbStderrListener :: Handle -> GdbW.GdbW -> IO ()
 gdbStderrListener h w = loop

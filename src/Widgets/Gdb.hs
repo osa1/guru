@@ -10,9 +10,12 @@ module Widgets.Gdb
   , addParsedMsg
   , addStderrMsg
   , addUserMsg
-  , addConsoleStreamRecord
-  , addTargetStreamRecord
-  , addLogStreamRecord
+  , addConsoleStreamMsg
+  , addTargetStreamMsg
+  , addLogStreamMsg
+  , addExecMsg
+  , addStatusMsg
+  , addNotifyMsg
   , addResultMsg
   ) where
 
@@ -106,18 +109,30 @@ addStderrMsg w = addMsg w "<span color=\"red\">[STDERR]</span> "
 addUserMsg :: GdbW -> T.Text -> IO ()
 addUserMsg w = addMsg w "> [USER] "
 
-addConsoleStreamRecord :: GdbW -> T.Text -> IO ()
-addConsoleStreamRecord w = addMsg w "<span color=\"#A1D490\">[CONSOLE]</span> "
+addConsoleStreamMsg :: GdbW -> T.Text -> IO ()
+addConsoleStreamMsg w = addMsg w "<span color=\"#A1D490\">[CONSOLE]</span> "
 
-addTargetStreamRecord :: GdbW -> T.Text -> IO ()
-addTargetStreamRecord w = addMsg w "<span color=\"#90C3D4\">[TARGET]</span> "
+addTargetStreamMsg :: GdbW -> T.Text -> IO ()
+addTargetStreamMsg w = addMsg w "<span color=\"#90C3D4\">[TARGET]</span> "
 
-addLogStreamRecord :: GdbW -> T.Text -> IO ()
-addLogStreamRecord w = addMsg w "<span color=\"#D4A190\">[LOG]</span> "
+addLogStreamMsg :: GdbW -> T.Text -> IO ()
+addLogStreamMsg w = addMsg w "<span color=\"#D4A190\">[LOG]</span> "
+
+addExecMsg :: GdbW -> T.Text -> IO ()
+addExecMsg w = addMsg w "<span color=\"#505B70\">[EXEC]</span> "
+
+addStatusMsg :: GdbW -> T.Text -> IO ()
+addStatusMsg w = addMsg w "<span color=\"#3FBCA6\">[STATUS]</span> "
+
+addNotifyMsg :: GdbW -> T.Text -> IO ()
+addNotifyMsg w = addMsg w "<span color=\"#CBCE79\">[NOTIFY]</span> "
 
 addResultMsg
     :: GdbW
     -> T.Text -- ^ Class
-    -> T.Text -- ^ Msg body
+    -> T.Text -- ^ Msg body. May be empty.
     -> IO ()
-addResultMsg w cls = addMsg w ("<span color=\"#6BDEB1\">[RESULT]</span> " <> cls <> ": ")
+addResultMsg w cls msg =
+    addMsg w
+      ("<span color=\"#6BDEB1\">[RESULT]</span> " <> cls <> if T.null msg then mempty else ": ")
+      msg
