@@ -18,7 +18,7 @@ library
     Gdb.Parser
     Gdb.Syntax
     Guru
-    Types
+    Guru.Types
 
   other-modules:
     Guru.Gdb

@@ -1,4 +1,4 @@
-module Types where
+module Guru.Types where
 
 import qualified Data.Text as T
 

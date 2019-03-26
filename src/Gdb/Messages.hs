@@ -20,7 +20,7 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 
 import Gdb.Syntax
-import Types
+import Guru.Types
 
 --------------------------------------------------------------------------------
 

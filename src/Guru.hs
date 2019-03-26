@@ -15,7 +15,7 @@ import Guru.Gdb (Gdb)
 import qualified Guru.Gdb as Gdb
 import Guru.Gui (Gui)
 import qualified Guru.Gui as Gui
-import Types
+import Guru.Types
 
 run :: [String] -> IO ()
 run gdb_args = do

@@ -16,7 +16,7 @@ import Data.GI.Base
 import qualified GI.Gtk as Gtk
 
 import qualified Guru.Gui.Backtrace as BtW
-import Types
+import Guru.Types
 
 -- | Layout: scrolled -> box -> [expander -> BacktraceW]
 data ThreadsW = ThreadsW

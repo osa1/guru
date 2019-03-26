@@ -15,7 +15,7 @@ import Data.Int
 import Data.GI.Base
 import qualified GI.Gtk as Gtk
 
-import Types (Backtrace, Frame (..))
+import Guru.Types (Backtrace, Frame (..))
 
 -- | Layout: just a TreeView
 data BacktraceW = BacktraceW

@@ -18,7 +18,7 @@ import qualified Data.Text as T
 import Data.GI.Base
 import qualified GI.Gtk as Gtk
 
-import Types
+import Guru.Types
 
 -- TODO: [Expr] lists below are kinda inefficient because we have to append to
 -- the end.
