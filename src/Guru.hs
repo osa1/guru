@@ -87,10 +87,10 @@ handleGdbMsg gui gdb msg =
     handleBpMsg _msg = return ()
 
 getExprChildren :: Gui -> Gdb -> T.Text -> IO ()
-getExprChildren gui gdb expr = undefined
+getExprChildren gui gdb expr = Gdb.getExprChildren gdb expr $ undefined
 
 addExpr :: Gui -> Gdb -> T.Text -> IO ()
-addExpr gui gdb expr = undefined
+addExpr gui gdb expr = Gdb.createVar gdb expr $ undefined
 
 renderVarList :: [(Gdb.Var, Gdb.Val)] -> T.Text
 -- TODO: Use a builder?

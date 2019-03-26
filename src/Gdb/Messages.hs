@@ -12,6 +12,7 @@ module Gdb.Messages
   , ChildrenList (..)
   , Value (..)
   , parseChildrenList
+  , parseValue
   ) where
 
 import Control.Lens
@@ -82,12 +83,10 @@ data Value = Value
 -- | Parse result of a `-var-list-children` command.
 parseChildrenList :: M.Map Var Val -> Maybe ChildrenList
 parseChildrenList vals =
-    ChildrenList <$> (M.lookup "children" vals >>= preview _ResList >>= mapM parseValue)
+    ChildrenList <$> (M.lookup "children" vals >>= preview _ResList >>= mapM (preview _Tuple . snd >=> parseValue))
 
-parseValue :: (Var, Val) -> Maybe Value
-parseValue (_, val) = do
-    -- TODO: Check var?
-    m <- preview _Tuple val
+parseValue :: M.Map Var Val -> Maybe Value
+parseValue m =
     Value <$> pure (M.lookup "exp" m >>= preview _Const)
           <*> (M.lookup "value" m >>= preview _Const)
           <*> (M.lookup "name" m >>= preview _Const)
