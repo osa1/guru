@@ -17,7 +17,6 @@ import qualified Data.Text as T
 import Data.GI.Base
 import qualified GI.Gtk as Gtk
 
-import Guru.Utils
 import Types
 
 import Debug.Trace
@@ -172,9 +171,12 @@ addExpr w expr value@(Value val name ty n_children) =
           case ns of
             [] -> do
               -- Top-level expression
-              iter <- Gtk.treeStoreAppend (_exprWStore w) Nothing
+              let store = _exprWStore w
+              iter <- Gtk.treeStoreAppend store Nothing
               vals <- mkStoreValues expr value
-              Gtk.treeStoreSet (_exprWStore w) iter storeCols vals
+              Gtk.treeStoreSet store iter storeCols vals
+              -- Create the placeholder if this has children
+              when (n_children /= 0) (addPlaceholder store iter)
               return (Expr iter name n expr (Just val) (Just ty) [] : exprs)
             _ ->
               -- Nested expression. Find top-level expression that this belongs
@@ -219,16 +221,41 @@ addChild _ parent expr _ [] = do
 -- Add the expression to the parent
 addChild store parent expr value@(Value val full_name ty n_children) [name] = do
     let parent_iter = _exprIter parent
-    iter <- Gtk.treeStoreAppend store (Just parent_iter)
     vals <- mkStoreValues expr value
-    Gtk.treeStoreSet store iter storeCols vals
-    -- TODO: create placeholder if this node has children
+    -- If the only child is the placeholder, update it
+    children_path <- Gtk.treeModelGetPath store parent_iter
+    Gtk.treePathDown children_path
+    (True, children_iter) <- Gtk.treeModelGetIter store children_path
+    child_gval <- Gtk.treeModelGetValue store children_iter 0
+    Just child_val :: Maybe T.Text <- fromGValue child_gval
+    iter <-
+      if child_val == placeholder then do
+        -- Update it
+        Gtk.treeStoreSet store children_iter storeCols vals
+        return children_iter
+      else do
+        -- Insert a new row
+        iter <- Gtk.treeStoreAppend store (Just parent_iter)
+        Gtk.treeStoreSet store iter storeCols vals
+        return iter
+
+    -- Create the placeholder if this has children
+    when (n_children /= 0) (addPlaceholder store iter)
     return (Expr iter full_name name expr (Just val) (Just ty) [])
 
 -- Find new parent, recurse
 addChild store parent expr value (n1:n2:ns) = do
     new_children <- modifyExpr (_exprChildren parent) n1 $ \new_parent -> addChild store new_parent expr value (n2:ns)
     return parent{ _exprChildren = new_children }
+
+addPlaceholder :: Gtk.TreeStore -> Gtk.TreeIter -> IO ()
+addPlaceholder store parent_iter =  do
+    iter <- Gtk.treeStoreAppend store (Just parent_iter)
+    vals <- mkStoreValues placeholder (Value placeholder placeholder placeholder 0)
+    Gtk.treeStoreSet store iter storeCols vals
+
+placeholder :: T.Text
+placeholder = "__PLACEHOLDER__"
 
 --------------------------------------------------------------------------------
 -- * Signals

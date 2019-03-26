@@ -34,8 +34,11 @@ activate app gdb_args = do
     Gui.connectExprAdded gui (addExpr gui gdb)
 
     -- Add some expressions for testing
-    Gui.addExpr gui "Foo" (Gdb.Value "Value" "A" "Type" 0)
+    Gui.addExpr gui "Foo" (Gdb.Value "Value" "A" "Type" 1)
     Gui.addExpr gui "Foo.Bar" (Gdb.Value "Value" "A.B" "Type" 0)
+    Gui.addExpr gui "X" (Gdb.Value "Value" "X" "Type" 10)
+    Gui.addExpr gui "Y" (Gdb.Value "Value" "Y" "Type" 0)
+    Gui.addExpr gui "X.T" (Gdb.Value "Value" "X.T" "Type" 0)
 
 addIdle :: IO () -> IO ()
 addIdle f = void (Gdk.threadsAddIdle GLib.PRIORITY_DEFAULT_IDLE (f >> return False))
