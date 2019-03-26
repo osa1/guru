@@ -225,6 +225,8 @@ addChild store parent expr value@(Value val full_name ty n_children) [name] = do
     -- If the only child is the placeholder, update it
     children_path <- Gtk.treeModelGetPath store parent_iter
     Gtk.treePathDown children_path
+    -- The iter should be valid (hence `True`) because for expressions with
+    -- children we always create a placeholder
     (True, children_iter) <- Gtk.treeModelGetIter store children_path
     child_gval <- Gtk.treeModelGetValue store children_iter 0
     Just child_val :: Maybe T.Text <- fromGValue child_gval
