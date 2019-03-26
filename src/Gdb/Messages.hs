@@ -12,6 +12,8 @@ module Gdb.Messages
   , Value (..)
   , parseChildrenList
   , parseValue
+
+  , parseVarUpdate
   ) where
 
 import Control.Lens
@@ -77,3 +79,15 @@ parseValue m =
           <*> (M.lookup "name" m >>= preview _Const)
           <*> (M.lookup "type" m >>= preview _Const)
           <*> fmap (read . T.unpack) (M.lookup "numchild" m >>= preview _Const)
+
+--------------------------------------------------------------------------------
+
+-- | Parse result of `-var-update` command. Returns (var, val) list.
+parseVarUpdate :: M.Map Var Val -> Maybe [(T.Text, T.Text)]
+parseVarUpdate m0 = M.lookup "changelist" m0 >>= preview _ValList >>= mapM parse_update
+  where
+    parse_update :: Val -> Maybe (T.Text, T.Text)
+    parse_update v = do
+      m <- preview _Tuple v
+      (,) <$> (M.lookup "name" m >>= preview _Const)
+          <*> (M.lookup "value" m >>= preview _Const)

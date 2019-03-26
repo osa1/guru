@@ -82,6 +82,8 @@ handleGdbMsg gui gdb msg =
           forM_ (Gdb._threadInfoThreads thread_info) $ \(Gdb.ThreadInfoThread thread_id target_id) ->
              Gdb.getThreadBacktrace gdb thread_id $
                addIdle . Gui.addThread gui thread_id target_id
+        Gdb.updateVars gdb $
+          addIdle . mapM_ (uncurry (Gui.updateValue gui))
 
       _ -> return ()
 

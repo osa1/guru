@@ -10,6 +10,7 @@ module Guru.Gdb
   , getThreadBacktrace
   , getExprChildren
   , createVar
+  , updateVars
 
     -- * Message types
   , ThreadInfo (..)
@@ -178,6 +179,13 @@ createVar gdb expr cb = do
     addCb gdb t (handleCreateVarRet cb)
     sendRawMsg gdb (T.pack (show t) <> "-var-create - @ " <> expr)
 
+-- | Update GDB variables. Sends a `-var-update` command.
+updateVars :: Gdb -> ([(T.Text, T.Text)] -> IO ()) -> IO ()
+updateVars gdb cb = do
+    t <- getToken gdb
+    addCb  gdb t (handleVarUpdateRet cb)
+    sendRawMsg gdb (T.pack (show t) <> "-var-update --all-values *")
+
 --------------------------------------------------------------------------------
 -- * Callback handling
 
@@ -206,3 +214,6 @@ handleListChildrenRet = handleCommandRet "var-list-children" Gdb.parseChildrenLi
 
 handleCreateVarRet :: (Value -> IO ()) -> Gdb.ResultOrOOB -> IO ()
 handleCreateVarRet = handleCommandRet "var-create" Gdb.parseValue
+
+handleVarUpdateRet :: ([(T.Text, T.Text)] -> IO ()) -> Gdb.ResultOrOOB -> IO ()
+handleVarUpdateRet = handleCommandRet "var-update" Gdb.parseVarUpdate

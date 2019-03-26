@@ -4,6 +4,7 @@ module Guru.Gui.Expressions
   , build
   , getGtkWidget
   , addExpr
+  , updateValue
   , connectGetChildren
   , connectExprAdded
   ) where
@@ -181,8 +182,8 @@ addExpr :: ExprW -> T.Text -> Value -> IO ()
 addExpr w expr value@(Value _ val name ty n_children) =
     case T.split (== '.') name of
       [] ->
-        putStrLn ("Empty path in addExpr for name: " ++ (T.unpack name))
-      n : ns -> do
+        putStrLn ("Empty path in addExpr for name: " ++ T.unpack name)
+      n : ns ->
         modifyMVar_ (_exprWExprs w) $ \exprs -> do
           case ns of
             [] -> do
@@ -274,6 +275,33 @@ addPlaceholder store parent_iter =  do
 
 placeholder :: T.Text
 placeholder = "__PLACEHOLDER__"
+
+updateValue
+    :: ExprW
+    -> T.Text -- ^ Full name of the expression
+    -> T.Text -- ^ New value
+    -> IO ()
+updateValue w full_name val = do
+    -- putStrLn ("Update value " ++ T.unpack full_name ++ " -> " ++ T.unpack val)
+    case T.split (== '.') full_name of
+      [] ->
+        putStrLn ("Empty path in updateValue for name: " ++ T.unpack full_name)
+      n : ns ->
+        modifyMVar_ (_exprWExprs w) (\exprs -> go exprs n ns)
+  where
+    go :: [Expr] -> T.Text -> [T.Text] -> IO [Expr]
+
+    go es node [] =
+      modifyExpr es node $ \e -> do
+        -- TODO: get rid these magic numbers
+        val' <- toGValue (Just val)
+        Gtk.treeStoreSetValue (_exprWStore w) (_exprIter e) 2 val'
+        return e{ _exprValue = Just val }
+
+    go es node (n : ns) =
+      modifyExpr es node $ \e -> do
+        new_children <- go (_exprChildren e) n ns
+        return e{ _exprChildren = new_children }
 
 --------------------------------------------------------------------------------
 -- * Signals

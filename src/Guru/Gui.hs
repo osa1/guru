@@ -26,7 +26,7 @@ module Guru.Gui
 
     -- * Expressions
   , addExpr
-
+  , updateValue
   ) where
 
 import qualified Data.Text as T
@@ -141,3 +141,10 @@ addThread = ThreadsW.addThread . _threads_w
 
 addExpr :: Gui -> T.Text -> Value -> IO ()
 addExpr = ExprW.addExpr . _expr_w
+
+updateValue
+    :: Gui
+    -> T.Text -- ^ Full name of the expression
+    -> T.Text -- ^ New value
+    -> IO ()
+updateValue = ExprW.updateValue . _expr_w
