@@ -3,6 +3,7 @@ module Guru (run) where
 import Control.Monad
 import qualified Data.Map as M
 import qualified Data.Text as T
+import Data.Maybe (fromJust) -- ;-( FIXME
 
 import Data.GI.Base
 import qualified GI.Gdk as Gdk
@@ -14,6 +15,7 @@ import Guru.Gdb (Gdb)
 import qualified Guru.Gdb as Gdb
 import Guru.Gui (Gui)
 import qualified Guru.Gui as Gui
+import Types
 
 run :: [String] -> IO ()
 run gdb_args = do
@@ -87,10 +89,11 @@ handleGdbMsg gui gdb msg =
     handleBpMsg _msg = return ()
 
 getExprChildren :: Gui -> Gdb -> T.Text -> IO ()
-getExprChildren gui gdb expr = Gdb.getExprChildren gdb expr (mapM_ (Gui.addExpr gui expr))
+getExprChildren gui gdb expr =
+    Gdb.getExprChildren gdb expr (mapM_ (\v -> addIdle (Gui.addExpr gui (fromJust (_valueExpr v)) v)))
 
 addExpr :: Gui -> Gdb -> T.Text -> IO ()
-addExpr gui gdb expr = Gdb.createVar gdb expr (Gui.addExpr gui expr)
+addExpr gui gdb expr = Gdb.createVar gdb expr (addIdle . Gui.addExpr gui expr)
 
 renderVarList :: [(Gdb.Var, Gdb.Val)] -> T.Text
 -- TODO: Use a builder?

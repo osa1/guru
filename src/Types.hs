@@ -25,7 +25,9 @@ data Frame = Frame
   } deriving (Show)
 
 data Value = Value
-  { _valueValue     :: !T.Text
+  { -- "exp" field, used when adding children. Document this better TODO
+    _valueExpr      :: !(Maybe T.Text)
+  , _valueValue     :: !T.Text
   , _valueName      :: !T.Text
   , _valueType      :: !T.Text
   , _valueNChildren :: !Int

@@ -72,7 +72,8 @@ parseChildrenList vals =
 
 parseValue :: M.Map Var Val -> Maybe Value
 parseValue m =
-    Value <$> (M.lookup "value" m >>= preview _Const)
+    Value <$> pure (M.lookup "exp" m >>= preview _Const)
+          <*> (M.lookup "value" m >>= preview _Const)
           <*> (M.lookup "name" m >>= preview _Const)
           <*> (M.lookup "type" m >>= preview _Const)
           <*> fmap (read . T.unpack) (M.lookup "numchild" m >>= preview _Const)

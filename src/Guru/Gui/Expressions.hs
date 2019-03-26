@@ -12,6 +12,7 @@ import Control.Concurrent.MVar
 import Control.Monad
 import Data.Int
 import Data.IORef
+import Data.List (foldl')
 import qualified Data.Text as T
 
 import Data.GI.Base
@@ -19,7 +20,13 @@ import qualified GI.Gtk as Gtk
 
 import Types
 
-import Debug.Trace
+-- TODO: [Expr] lists below are kinda inefficient because we have to append to
+-- the end.
+
+-- TODO: The invariant we need to maintain below: if a node is expanded and has
+-- [i1, i2, ..., in] as indices in the TreeStore, then these indices should also
+-- give the Expr for it in the ExprW. This means that [Expr] lists below are
+-- appended to the end. NO CONSING!
 
 -- | Layout: box -> [scrolled -> tree view, entry]
 data ExprW = ExprW
@@ -54,6 +61,16 @@ data Expr = Expr
   , _exprType     :: !(Maybe T.Text)
   , _exprChildren :: ![Expr]
   }
+
+{-
+showExpr :: Expr -> String
+showExpr expr = "Expr{ fullName = " ++ T.unpack (_exprFullName expr) ++ ", name = " ++ T.unpack (_exprName expr) ++ " }"
+
+showTree :: [Expr] -> String
+showTree = go 0
+  where
+    go indent es = concat (map (\e -> replicate indent ' ' ++ showExpr e ++ "\n" ++ go (indent + 4) (_exprChildren e)) es)
+-}
 
 colTypes :: [GType]
 colTypes =
@@ -134,7 +151,7 @@ build = do
           Just (i0 : is) -> do
             exprs <- readMVar exprs_ref
             let top_expr = exprs !! fromIntegral i0
-            let expr = foldr (\i e -> _exprChildren e !! fromIntegral i) top_expr is
+            let expr = foldl' (\e i -> _exprChildren e !! fromIntegral i) top_expr is
             when (null (_exprChildren expr)) (get_children (_exprFullName expr))
 
     ---------------------------------------
@@ -161,13 +178,12 @@ getGtkWidget = Gtk.toWidget . _exprWBox
 -- TODO: Document this mess. Clarify name/full name confusion.
 
 addExpr :: ExprW -> T.Text -> Value -> IO ()
-addExpr w expr value@(Value val name ty n_children) =
-    trace ("addExpr " ++ T.unpack expr ++ " name: " ++ T.unpack name) $
+addExpr w expr value@(Value _ val name ty n_children) =
     case T.split (== '.') name of
       [] ->
         putStrLn ("Empty path in addExpr for name: " ++ (T.unpack name))
-      n : ns ->
-        modifyMVar_ (_exprWExprs w) $ \exprs ->
+      n : ns -> do
+        modifyMVar_ (_exprWExprs w) $ \exprs -> do
           case ns of
             [] -> do
               -- Top-level expression
@@ -177,7 +193,7 @@ addExpr w expr value@(Value val name ty n_children) =
               Gtk.treeStoreSet store iter storeCols vals
               -- Create the placeholder if this has children
               when (n_children /= 0) (addPlaceholder store iter)
-              return (Expr iter name n expr (Just val) (Just ty) [] : exprs)
+              return (exprs ++ [Expr iter name n expr (Just val) (Just ty) []])
             _ ->
               -- Nested expression. Find top-level expression that this belongs
               -- to and add child expression to it.
@@ -187,7 +203,7 @@ storeCols :: [Int32]
 storeCols = [0,1,2,3]
 
 mkStoreValues :: T.Text -> Value -> IO [GValue]
-mkStoreValues expr (Value val full_name ty _n_children) = do
+mkStoreValues expr (Value _ val full_name ty _n_children) = do
     col0 <- toGValue (Just full_name) -- full name, not rendered
     col1 <- toGValue (Just expr) -- expression
     col2 <- toGValue (Just val) -- value
@@ -201,7 +217,7 @@ modifyExpr [] parent _ = do
     return []
 -- Search through the list
 modifyExpr (e : es) parent modify
-  | trace ("modifyExpr checking " ++ T.unpack (_exprName e)) (_exprName e == parent)
+  | _exprName e == parent
   = (: es) <$> modify e
   | otherwise
   = (e :) <$> modifyExpr es parent modify
@@ -219,7 +235,7 @@ addChild _ parent expr _ [] = do
     return parent
 
 -- Add the expression to the parent
-addChild store parent expr value@(Value val full_name ty n_children) [name] = do
+addChild store parent expr value@(Value _ val full_name ty n_children) [name] = do
     let parent_iter = _exprIter parent
     vals <- mkStoreValues expr value
     -- If the only child is the placeholder, update it
@@ -243,7 +259,7 @@ addChild store parent expr value@(Value val full_name ty n_children) [name] = do
 
     -- Create the placeholder if this has children
     when (n_children /= 0) (addPlaceholder store iter)
-    return (Expr iter full_name name expr (Just val) (Just ty) [])
+    return parent{ _exprChildren = _exprChildren parent ++ [Expr iter full_name name expr (Just val) (Just ty) []] }
 
 -- Find new parent, recurse
 addChild store parent expr value (n1:n2:ns) = do
@@ -253,7 +269,7 @@ addChild store parent expr value (n1:n2:ns) = do
 addPlaceholder :: Gtk.TreeStore -> Gtk.TreeIter -> IO ()
 addPlaceholder store parent_iter =  do
     iter <- Gtk.treeStoreAppend store (Just parent_iter)
-    vals <- mkStoreValues placeholder (Value placeholder placeholder placeholder 0)
+    vals <- mkStoreValues placeholder (Value Nothing placeholder placeholder placeholder 0)
     Gtk.treeStoreSet store iter storeCols vals
 
 placeholder :: T.Text
