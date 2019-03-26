@@ -20,6 +20,7 @@ module Guru.Gui
   , addNotifyMsg
   , addResultMsg
   , addRawOutMsg
+  , addRawInMsg
 
     -- * Thread stuff
   , addThread
@@ -129,6 +130,10 @@ addResultMsg = GdbW.addResultMsg . _gdb_w
 -- | Log a message from GURU to GDB.
 addRawOutMsg :: Gui -> T.Text -> IO ()
 addRawOutMsg = GdbW.addRawOutMsg . _gdb_w
+
+-- | Log a message from GDB to GURU.
+addRawInMsg :: Gui -> T.Text -> IO ()
+addRawInMsg = GdbW.addRawInMsg . _gdb_w
 
 --------------------------------------------------------------------------------
 -- * Backtrace stuff

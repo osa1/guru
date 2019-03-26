@@ -29,6 +29,7 @@ import Data.IORef
 import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
+import Data.Text.Encoding (decodeUtf8')
 import System.IO
 import System.Process.Typed
 
@@ -53,12 +54,14 @@ data Gdb = Gdb
   { _gdbStdin     :: !Handle
   , _gdbToken     :: !(IORef Int)
   , _gdbCallbacks :: !(IORef (IM.IntMap (Gdb.ResultOrOOB -> IO ())))
-  , _gdbLogOut    :: !GdbLogRawMsg
+  , _gdbLogOut    :: !GdbLogRawOutMsg
+  , _gdbLogIn     :: !GdbLogRawInMsg
   }
 
 type GdbStdoutHandler = Gdb -> Gdb.ResultOrOOB -> IO ()
 type GdbStderrHandler = T.Text -> IO ()
-type GdbLogRawMsg = T.Text -> IO ()
+type GdbLogRawOutMsg = T.Text -> IO ()
+type GdbLogRawInMsg = T.Text -> IO ()
 
 -- | Spawns a GDB process and listens stdout and stderr. Does not block.
 spawn
@@ -68,12 +71,14 @@ spawn
        -- ^ GDB message callback.
     -> GdbStderrHandler
        -- ^ GDB bridge logs are passed to this callback.
-    -> GdbLogRawMsg
+    -> GdbLogRawOutMsg
        -- ^ How to log outgoing messages
+    -> GdbLogRawInMsg
+       -- ^ How to log incoming messages
     -> IO ()
        -- ^ Called when the GDB process exits.
     -> IO Gdb
-spawn args handle_msg log_stderr log_out exit_cb = do
+spawn args handle_msg log_stderr log_out log_in exit_cb = do
     let p = setStdin createPipe $
             setStdout createPipe $
             setStderr createPipe $
@@ -84,12 +89,12 @@ spawn args handle_msg log_stderr log_out exit_cb = do
     cbs_ref <- newIORef IM.empty
 
     void $ forkIO ((withProcess_ p (handleProc stdin_ref token_ref cbs_ref) `finally` exit_cb) `catch` exit_code_handler)
-
-    Gdb <$> takeMVar stdin_ref <*> pure token_ref <*> pure cbs_ref <*> pure log_out
+    gdb_stdin <- takeMVar stdin_ref
+    return (Gdb gdb_stdin token_ref cbs_ref log_out log_in)
   where
     handleProc stdin_ref token_ref cbs_ref p = do
       putMVar stdin_ref (getStdin p)
-      let gdb = Gdb (getStdin p) token_ref cbs_ref log_out
+      let gdb = Gdb (getStdin p) token_ref cbs_ref log_out log_in
       _ <- forkIO (listenStdout (getStdout p) gdb handle_msg)
       listenStderr (getStderr p) log_stderr
 
@@ -108,7 +113,9 @@ listenStdout h gdb cb = loop (parse mempty)
 
     loop (A.Partial cont) = do
       bs <- BS.hGetSome h 10000
-      -- putStrLn ("Read: " ++ show bs)
+      _gdbLogIn gdb $ case decodeUtf8' bs of
+        Left _ -> T.pack (show (BS.unpack bs))
+        Right t -> t
       loop (cont bs)
 
     loop (A.Done unconsumed ret) = do

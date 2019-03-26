@@ -18,6 +18,7 @@ module Guru.Gui.Gdb
   , addNotifyMsg
   , addResultMsg
   , addRawOutMsg
+  , addRawInMsg
   ) where
 
 import Control.Monad
@@ -146,3 +147,7 @@ addResultMsg w cls msg =
 -- | Log a message from GURU to GDB.
 addRawOutMsg :: GdbW -> T.Text -> IO ()
 addRawOutMsg w = addMsg w "[GURU->GDB] "
+
+-- | Log a message from GDB to GURU.
+addRawInMsg :: GdbW -> T.Text -> IO ()
+addRawInMsg w = addMsg w "[GDB->GURU] "

@@ -29,7 +29,13 @@ run gdb_args = do
 activate :: Gtk.Application -> [String] -> IO ()
 activate app gdb_args = do
     gui <- Gui.build app
-    gdb <- Gdb.spawn gdb_args (handleGdbMsg gui) (handleGdbStderr gui) (addIdle . Gui.addRawOutMsg gui) (handleGdbExit gui)
+    gdb <- Gdb.spawn gdb_args
+             (handleGdbMsg gui)
+             (handleGdbStderr gui)
+             (addIdle . Gui.addRawOutMsg gui)
+             -- (addIdle . Gui.addRawInMsg gui)
+             (const (return ()))
+             (handleGdbExit gui)
     Gui.enterConnectedState gui
     Gui.connectMsgSubmitted gui (msgSubmitted gui gdb)
     Gui.connectGetExprChildren gui (getExprChildren gui gdb)
