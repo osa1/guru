@@ -33,13 +33,6 @@ activate app gdb_args = do
     Gui.connectGetExprChildren gui (getExprChildren gui gdb)
     Gui.connectExprAdded gui (addExpr gui gdb)
 
-    -- Add some expressions for testing
-    Gui.addExpr gui "Foo" (Gdb.Value "Value" "A" "Type" 1)
-    Gui.addExpr gui "Foo.Bar" (Gdb.Value "Value" "A.B" "Type" 0)
-    Gui.addExpr gui "X" (Gdb.Value "Value" "X" "Type" 10)
-    Gui.addExpr gui "Y" (Gdb.Value "Value" "Y" "Type" 0)
-    Gui.addExpr gui "X.T" (Gdb.Value "Value" "X.T" "Type" 0)
-
 addIdle :: IO () -> IO ()
 addIdle f = void (Gdk.threadsAddIdle GLib.PRIORITY_DEFAULT_IDLE (f >> return False))
 
@@ -50,7 +43,7 @@ handleGdbExit :: Gui -> IO ()
 handleGdbExit = addIdle . Gui.enterDisconnectedState
 
 msgSubmitted :: Gui -> Gdb -> T.Text -> IO ()
-msgSubmitted gui gdb msg = do
+msgSubmitted _gui gdb msg = do
     Gdb.sendRawMsg gdb msg
     -- addIdle (Gui.addUserMsg gui msg)
 
@@ -94,10 +87,10 @@ handleGdbMsg gui gdb msg =
     handleBpMsg _msg = return ()
 
 getExprChildren :: Gui -> Gdb -> T.Text -> IO ()
-getExprChildren gui gdb expr = Gdb.getExprChildren gdb expr $ undefined
+getExprChildren gui gdb expr = Gdb.getExprChildren gdb expr (mapM_ (Gui.addExpr gui expr))
 
 addExpr :: Gui -> Gdb -> T.Text -> IO ()
-addExpr gui gdb expr = Gdb.createVar gdb expr $ undefined
+addExpr gui gdb expr = Gdb.createVar gdb expr (Gui.addExpr gui expr)
 
 renderVarList :: [(Gdb.Var, Gdb.Val)] -> T.Text
 -- TODO: Use a builder?

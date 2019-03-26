@@ -9,7 +9,6 @@ module Gdb.Messages
   , Backtrace
   , parseThreadBacktrace
 
-  , ChildrenList (..)
   , Value (..)
   , parseChildrenList
   , parseValue
@@ -66,15 +65,10 @@ parseThreadBacktrace vals =
 
 --------------------------------------------------------------------------------
 
--- | Result of a `-var-list-children` command.
-newtype ChildrenList = ChildrenList
-  { _childrenList :: [Value]
-  } deriving (Show)
-
 -- | Parse result of a `-var-list-children` command.
-parseChildrenList :: M.Map Var Val -> Maybe ChildrenList
+parseChildrenList :: M.Map Var Val -> Maybe [Value]
 parseChildrenList vals =
-    ChildrenList <$> (M.lookup "children" vals >>= preview _ResList >>= mapM (preview _Tuple . snd >=> parseValue))
+    M.lookup "children" vals >>= preview _ResList >>= mapM (preview _Tuple . snd >=> parseValue)
 
 parseValue :: M.Map Var Val -> Maybe Value
 parseValue m =

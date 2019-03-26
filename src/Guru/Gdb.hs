@@ -14,7 +14,6 @@ module Guru.Gdb
     -- * Message types
   , ThreadInfo (..)
   , ThreadInfoThread (..)
-  , ChildrenList (..)
   , Value (..)
   , Backtrace
   ) where
@@ -32,8 +31,8 @@ import qualified Data.Text.IO as T
 import System.IO
 import System.Process.Typed
 
-import Gdb.Messages (Backtrace, ChildrenList (..), ThreadInfo (..),
-                     ThreadInfoThread (..), Value (..))
+import Gdb.Messages (Backtrace, ThreadInfo (..), ThreadInfoThread (..),
+                     Value (..))
 import qualified Gdb.Messages as Gdb
 import qualified Gdb.Parser as Gdb
 import Gdb.Syntax
@@ -165,7 +164,7 @@ getThreadBacktrace gdb thread_id cb = do
 getExprChildren
     :: Gdb
     -> T.Text -- ^ Full name of the expression
-    -> (ChildrenList -> IO ())
+    -> ([Value] -> IO ())
     -> IO ()
 getExprChildren gdb expr cb = do
     t <- getToken gdb
@@ -202,7 +201,7 @@ handleThreadInfoRet = handleCommandRet "thread-info" Gdb.parseThreadInfo
 handleStackListFramesRet :: (Backtrace -> IO ()) -> Gdb.ResultOrOOB -> IO ()
 handleStackListFramesRet = handleCommandRet "stack-list-frames" Gdb.parseThreadBacktrace
 
-handleListChildrenRet :: (ChildrenList -> IO ()) -> Gdb.ResultOrOOB -> IO ()
+handleListChildrenRet :: ([Value] -> IO ()) -> Gdb.ResultOrOOB -> IO ()
 handleListChildrenRet = handleCommandRet "var-list-children" Gdb.parseChildrenList
 
 handleCreateVarRet :: (Value -> IO ()) -> Gdb.ResultOrOOB -> IO ()
