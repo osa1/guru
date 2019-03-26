@@ -30,6 +30,8 @@ activate app gdb_args = do
     gdb <- Gdb.spawn gdb_args (handleGdbMsg gui) (handleGdbStderr gui) (addIdle . Gui.addRawOutMsg gui) (handleGdbExit gui)
     Gui.enterConnectedState gui
     Gui.connectMsgSubmitted gui (msgSubmitted gui gdb)
+    Gui.connectGetExprChildren gui (getExprChildren gui gdb)
+    Gui.connectExprAdded gui (addExpr gui gdb)
 
 addIdle :: IO () -> IO ()
 addIdle f = void (Gdk.threadsAddIdle GLib.PRIORITY_DEFAULT_IDLE (f >> return False))
@@ -83,6 +85,12 @@ handleGdbMsg gui gdb msg =
 
     handleBpMsg :: M.Map Gdb.Var Gdb.Val -> IO ()
     handleBpMsg _msg = return ()
+
+getExprChildren :: Gui -> Gdb -> T.Text -> IO ()
+getExprChildren gui gdb expr = undefined
+
+addExpr :: Gui -> Gdb -> T.Text -> IO ()
+addExpr gui gdb expr = undefined
 
 renderVarList :: [(Gdb.Var, Gdb.Val)] -> T.Text
 -- TODO: Use a builder?

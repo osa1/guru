@@ -4,6 +4,8 @@ module Guru.Gui
   , enterConnectedState
   , enterDisconnectedState
   , connectMsgSubmitted
+  , connectGetExprChildren
+  , connectExprAdded
 
     -- * Rendering messages
   , addError
@@ -85,6 +87,15 @@ enterDisconnectedState = GdbW.enterConnectedState . _gdb_w
 -- | Signalled when a non-empty text is entered in the GDB widget's entry.
 connectMsgSubmitted :: Gui -> (T.Text -> IO ()) -> IO ()
 connectMsgSubmitted = GdbW.connectMsgSubmitted . _gdb_w
+
+-- | Register a callback for requesting expression children. `Text` argument is
+-- the full name of the expression that we want to ask children of.
+connectGetExprChildren :: Gui -> (T.Text -> IO ()) -> IO ()
+connectGetExprChildren = ExprW.connectGetChildren . _expr_w
+
+-- | Signalled when a new expression is added via the expression widget's entry.
+connectExprAdded :: Gui -> (T.Text -> IO ()) -> IO ()
+connectExprAdded = ExprW.connectExprAdded . _expr_w
 
 --------------------------------------------------------------------------------
 -- * Rendering GDB messages

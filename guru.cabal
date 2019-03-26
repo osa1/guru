@@ -24,6 +24,7 @@ library
     Guru.Gdb
     Guru.Gui
     Guru.Gui.Backtrace
+    Guru.Gui.Expressions
     Guru.Gui.Gdb
     Guru.Gui.Threads
 

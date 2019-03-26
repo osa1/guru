@@ -8,10 +8,13 @@ module Guru.Gdb
   , sendRawMsg
   , getThreadInfo
   , getThreadBacktrace
+  , getExprChildren
 
     -- * Message types
   , ThreadInfo (..)
   , ThreadInfoThread (..)
+  , ChildrenList (..)
+  , Value (..)
   , Backtrace
   ) where
 
@@ -22,12 +25,14 @@ import qualified Data.Attoparsec.ByteString as A
 import qualified Data.ByteString as BS
 import qualified Data.IntMap.Strict as IM
 import Data.IORef
+import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 import System.IO
 import System.Process.Typed
 
-import Gdb.Messages (Backtrace, ThreadInfo (..), ThreadInfoThread (..))
+import Gdb.Messages (Backtrace, ChildrenList (..), ThreadInfo (..),
+                     ThreadInfoThread (..), Value (..))
 import qualified Gdb.Messages as Gdb
 import qualified Gdb.Parser as Gdb
 import Gdb.Syntax
@@ -155,23 +160,39 @@ getThreadBacktrace gdb thread_id cb = do
     addCb gdb t (handleStackListFramesRet cb)
     sendRawMsg gdb (T.pack (show t) <> "-stack-list-frames --thread " <> T.pack (show thread_id))
 
+-- | Requests children of an expression. Sends a `-var-list-children` command.
+getExprChildren
+    :: Gdb
+    -> T.Text -- ^ Full name of the expression
+    -> (ChildrenList -> IO ())
+    -> IO ()
+getExprChildren gdb expr cb = do
+    t <- getToken gdb
+    addCb gdb t (handleListChildrenRet cb)
+    sendRawMsg gdb (T.pack (show t) <> "-var-list-children --all-values " <> expr)
+
 --------------------------------------------------------------------------------
 -- * Callback handling
 
+handleCommandRet
+    :: String -- ^ Name of the command
+    -> (M.Map Gdb.Var Gdb.Val -> Maybe a) -- ^ Parser for the command
+    -> (a -> IO ()) -- ^ Callback to be called on successful parse
+    -> Gdb.ResultOrOOB -- ^ GDB result
+    -> IO ()
+handleCommandRet cmd parse cb msg =
+    case msg of
+      Gdb.Result Gdb.Done vals ->
+        case parse vals of
+          Nothing -> hPutStrLn stderr ("Can't parse " ++ cmd ++ " ret: " ++ show vals)
+          Just ret -> cb ret
+      _ -> hPutStrLn stderr ("Unexpected " ++ cmd ++ " result msg: " ++ show msg)
+
 handleThreadInfoRet :: (ThreadInfo -> IO ()) -> Gdb.ResultOrOOB -> IO ()
-handleThreadInfoRet cb msg = case msg of
-    Gdb.Result Gdb.Done vals ->
-      case Gdb.parseThreadInfo vals of
-        Nothing -> hPutStrLn stderr ("Can't parse thread info ret: " ++ show vals)
-        Just thread_info -> cb thread_info
-    _ ->
-      hPutStrLn stderr ("Unexpected thread info ret: " ++ show msg)
+handleThreadInfoRet = handleCommandRet "thread-info" Gdb.parseThreadInfo
 
 handleStackListFramesRet :: (Backtrace -> IO ()) -> Gdb.ResultOrOOB -> IO ()
-handleStackListFramesRet cb msg = case msg of
-    Gdb.Result Gdb.Done vals ->
-      case Gdb.parseThreadBacktrace vals of
-        Nothing -> hPutStrLn stderr ("Can't parse thread backtrace ret: " ++ show vals)
-        Just bt -> cb bt
-    _ ->
-      hPutStrLn stderr ("Unexpected thread info ret: " ++ show msg)
+handleStackListFramesRet = handleCommandRet "stack-list-frames" Gdb.parseThreadBacktrace
+
+handleListChildrenRet :: (ChildrenList -> IO ()) -> Gdb.ResultOrOOB -> IO ()
+handleListChildrenRet = handleCommandRet "var-list-children" Gdb.parseChildrenList

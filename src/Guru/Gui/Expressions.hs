@@ -3,6 +3,8 @@ module Guru.Gui.Expressions
   ( ExprW
   , build
   , getGtkWidget
+  , connectGetChildren
+  , connectExprAdded
   ) where
 
 import Control.Monad
@@ -113,7 +115,7 @@ build = do
     get_children_ref <- newIORef Nothing
     exprs_ref <- newIORef []
 
-    void $ Gtk.onTreeViewRowExpanded view $ \iter path -> do
+    void $ Gtk.onTreeViewRowExpanded view $ \_iter path -> do
       mb_get_children <- readIORef get_children_ref
       forM_ mb_get_children $ \get_children ->
         -- These indices give the location of the node in the tree.
@@ -143,3 +145,9 @@ build = do
 
 getGtkWidget :: ExprW -> IO Gtk.Widget
 getGtkWidget = Gtk.toWidget . _exprWBox
+
+connectGetChildren :: ExprW -> (T.Text -> IO ()) -> IO ()
+connectGetChildren w cb = writeIORef (_exprWGetChildren w) (Just cb)
+
+connectExprAdded :: ExprW -> (T.Text -> IO ()) -> IO ()
+connectExprAdded w cb = writeIORef (_exprWAdded w) (Just cb)
