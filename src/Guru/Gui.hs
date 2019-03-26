@@ -23,6 +23,10 @@ module Guru.Gui
 
     -- * Thread stuff
   , addThread
+
+    -- * Expressions
+  , addExpr
+
   ) where
 
 import qualified Data.Text as T
@@ -131,3 +135,9 @@ addRawOutMsg = GdbW.addRawOutMsg . _gdb_w
 
 addThread :: Gui -> ThreadId -> TargetId -> Backtrace -> IO ()
 addThread = ThreadsW.addThread . _threads_w
+
+--------------------------------------------------------------------------------
+-- * Expressions
+
+addExpr :: Gui -> T.Text -> Value -> IO ()
+addExpr = ExprW.addExpr . _expr_w

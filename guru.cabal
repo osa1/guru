@@ -27,6 +27,7 @@ library
     Guru.Gui.Expressions
     Guru.Gui.Gdb
     Guru.Gui.Threads
+    Guru.Utils
 
   hs-source-dirs: src
 

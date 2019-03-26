@@ -71,15 +71,6 @@ newtype ChildrenList = ChildrenList
   { _childrenList :: [Value]
   } deriving (Show)
 
-data Value = Value
-  { -- "exp" field, I don't understand what this is
-    _valueExpr      :: !(Maybe T.Text)
-  , _valueValue     :: !T.Text
-  , _valueName      :: !T.Text
-  , _valueType      :: !T.Text
-  , _valueNChildren :: !Int
-  } deriving (Show)
-
 -- | Parse result of a `-var-list-children` command.
 parseChildrenList :: M.Map Var Val -> Maybe ChildrenList
 parseChildrenList vals =
@@ -87,8 +78,7 @@ parseChildrenList vals =
 
 parseValue :: M.Map Var Val -> Maybe Value
 parseValue m =
-    Value <$> pure (M.lookup "exp" m >>= preview _Const)
-          <*> (M.lookup "value" m >>= preview _Const)
+    Value <$> (M.lookup "value" m >>= preview _Const)
           <*> (M.lookup "name" m >>= preview _Const)
           <*> (M.lookup "type" m >>= preview _Const)
           <*> fmap (read . T.unpack) (M.lookup "numchild" m >>= preview _Const)

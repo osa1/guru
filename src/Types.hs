@@ -23,3 +23,10 @@ data Frame = Frame
     -- if the frame’s function is not known.
   , _frameFrom     :: !(Maybe T.Text)
   } deriving (Show)
+
+data Value = Value
+  { _valueValue     :: !T.Text
+  , _valueName      :: !T.Text
+  , _valueType      :: !T.Text
+  , _valueNChildren :: !Int
+  } deriving (Show)

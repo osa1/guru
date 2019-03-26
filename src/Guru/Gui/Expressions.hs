@@ -3,16 +3,24 @@ module Guru.Gui.Expressions
   ( ExprW
   , build
   , getGtkWidget
+  , addExpr
   , connectGetChildren
   , connectExprAdded
   ) where
 
+import Control.Concurrent.MVar
 import Control.Monad
+import Data.Int
 import Data.IORef
 import qualified Data.Text as T
 
 import Data.GI.Base
 import qualified GI.Gtk as Gtk
+
+import Guru.Utils
+import Types
+
+import Debug.Trace
 
 -- | Layout: box -> [scrolled -> tree view, entry]
 data ExprW = ExprW
@@ -22,8 +30,9 @@ data ExprW = ExprW
   , _exprWEntry       :: !Gtk.Entry
     -- | The top level
   , _exprWBox         :: !Gtk.Box
-    -- | Top-level expressions
-  , _exprWExprs       :: IORef [Expr]
+    -- | Top-level expressions. MVar because we do IO (update GUI) when updating
+    -- this.
+  , _exprWExprs       :: !(MVar [Expr])
     -- | How to get children of an expression. `Text` is the full name of the
     -- expression.
   , _exprWGetChildren :: !(IORef (Maybe (T.Text -> IO ())))
@@ -113,7 +122,7 @@ build = do
     -- expanded for the first time, we query child nodes.
 
     get_children_ref <- newIORef Nothing
-    exprs_ref <- newIORef []
+    exprs_ref <- newMVar []
 
     void $ Gtk.onTreeViewRowExpanded view $ \_iter path -> do
       mb_get_children <- readIORef get_children_ref
@@ -124,7 +133,7 @@ build = do
           Nothing -> putStrLn "Empty expression index"
           Just [] -> putStrLn "Empty expression index"
           Just (i0 : is) -> do
-            exprs <- readIORef exprs_ref
+            exprs <- readMVar exprs_ref
             let top_expr = exprs !! fromIntegral i0
             let expr = foldr (\i e -> _exprChildren e !! fromIntegral i) top_expr is
             when (null (_exprChildren expr)) (get_children (_exprFullName expr))
@@ -145,6 +154,85 @@ build = do
 
 getGtkWidget :: ExprW -> IO Gtk.Widget
 getGtkWidget = Gtk.toWidget . _exprWBox
+
+--------------------------------------------------------------------------------
+-- * Adding and updating expressions
+--------------------------------------------------------------------------------
+
+-- TODO: Document this mess. Clarify name/full name confusion.
+
+addExpr :: ExprW -> T.Text -> Value -> IO ()
+addExpr w expr value@(Value val name ty n_children) =
+    trace ("addExpr " ++ T.unpack expr ++ " name: " ++ T.unpack name) $
+    case T.split (== '.') name of
+      [] ->
+        putStrLn ("Empty path in addExpr for name: " ++ (T.unpack name))
+      n : ns ->
+        modifyMVar_ (_exprWExprs w) $ \exprs ->
+          case ns of
+            [] -> do
+              -- Top-level expression
+              iter <- Gtk.treeStoreAppend (_exprWStore w) Nothing
+              vals <- mkStoreValues expr value
+              Gtk.treeStoreSet (_exprWStore w) iter storeCols vals
+              return (Expr iter name n expr (Just val) (Just ty) [] : exprs)
+            _ ->
+              -- Nested expression. Find top-level expression that this belongs
+              -- to and add child expression to it.
+              modifyExpr exprs n (\parent -> addChild (_exprWStore w) parent expr value ns)
+
+storeCols :: [Int32]
+storeCols = [0,1,2,3]
+
+mkStoreValues :: T.Text -> Value -> IO [GValue]
+mkStoreValues expr (Value val full_name ty _n_children) = do
+    col0 <- toGValue (Just full_name) -- full name, not rendered
+    col1 <- toGValue (Just expr) -- expression
+    col2 <- toGValue (Just val) -- value
+    col3 <- toGValue (Just ty) -- type
+    return [col0, col1, col2, col3]
+
+modifyExpr :: [Expr] -> T.Text -> (Expr -> IO Expr) -> IO [Expr]
+-- Couldn't find the top-level. This should be a bug, so just report it.
+modifyExpr [] parent _ = do
+    putStrLn ("modifyExpr: Couldn't find parent expression: " ++ T.unpack parent)
+    return []
+-- Search through the list
+modifyExpr (e : es) parent modify
+  | trace ("modifyExpr checking " ++ T.unpack (_exprName e)) (_exprName e == parent)
+  = (: es) <$> modify e
+  | otherwise
+  = (e :) <$> modifyExpr es parent modify
+
+addChild
+    :: Gtk.TreeStore
+    -> Expr -- ^ Parent expression
+    -> T.Text -- ^ The expression
+    -> Value
+    -> [T.Text] -- ^ Path to the child from the parent expression.
+    -> IO Expr
+
+addChild _ parent expr _ [] = do
+    putStrLn ("addChild: empty path for expr: " ++ T.unpack expr)
+    return parent
+
+-- Add the expression to the parent
+addChild store parent expr value@(Value val full_name ty n_children) [name] = do
+    let parent_iter = _exprIter parent
+    iter <- Gtk.treeStoreAppend store (Just parent_iter)
+    vals <- mkStoreValues expr value
+    Gtk.treeStoreSet store iter storeCols vals
+    -- TODO: create placeholder if this node has children
+    return (Expr iter full_name name expr (Just val) (Just ty) [])
+
+-- Find new parent, recurse
+addChild store parent expr value (n1:n2:ns) = do
+    new_children <- modifyExpr (_exprChildren parent) n1 $ \new_parent -> addChild store new_parent expr value (n2:ns)
+    return parent{ _exprChildren = new_children }
+
+--------------------------------------------------------------------------------
+-- * Signals
+--------------------------------------------------------------------------------
 
 connectGetChildren :: ExprW -> (T.Text -> IO ()) -> IO ()
 connectGetChildren w cb = writeIORef (_exprWGetChildren w) (Just cb)
