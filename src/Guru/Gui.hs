@@ -37,7 +37,8 @@ import qualified GI.Gtk as Gtk
 
 import qualified Guru.Gui.Expressions as ExprW
 import qualified Guru.Gui.Gdb as GdbW
-import qualified Guru.Gui.Threads as ThreadsW
+-- import qualified Guru.Gui.Threads as ThreadsW
+import qualified Guru.Gui.Threads2 as ThreadsW
 import Guru.Types
 
 data Gui = Gui
